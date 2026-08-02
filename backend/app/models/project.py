@@ -1,7 +1,7 @@
 """项目、成员、TR 模板与节点、任务模型。"""
 from datetime import date
 
-from sqlalchemy import BigInteger, Boolean, Date, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, IdMixin, SoftDeleteMixin, TimestampMixin
@@ -32,6 +32,19 @@ class ProjectMember(IdMixin, SoftDeleteMixin, Base):
     project_role: Mapped[str | None] = mapped_column(String(32))
     is_invested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     joined_at = mapped_column(Date, nullable=True)
+
+
+class ProjectRoleAssignment(IdMixin, Base):
+    __tablename__ = "project_role_assignment"
+    __table_args__ = (
+        CheckConstraint("role IN ('SE', 'TPM', 'TL/FO', 'CodeReview')", name="ck_project_role_assignment_role"),
+        UniqueConstraint("project_id", "role", "user_id", name="ux_project_role_assignment"),
+    )
+
+    project_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("project.id", ondelete="RESTRICT"), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("user.id", ondelete="RESTRICT"), nullable=False)
+    created_at = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class TrTemplate(IdMixin, Base):

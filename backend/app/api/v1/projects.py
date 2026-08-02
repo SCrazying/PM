@@ -44,6 +44,7 @@ def get_project(project_id: int, user: dict = Depends(get_current_user), db: Ses
     p = svc.get_project(project_id)
     out = ProjectOut.model_validate(p).model_dump()
     out["members"] = svc.list_members(project_id)
+    out["role_assignments"] = svc.list_role_assignments(project_id)
     out["nodes"] = [
         {"id": n.id, "node_key": n.node_key, "name": n.name, "sequence": n.sequence, "status": n.status,
          "planned_start": n.planned_start, "planned_end": n.planned_end,

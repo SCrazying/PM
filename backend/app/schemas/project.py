@@ -1,6 +1,6 @@
 """项目、节点、任务相关 Schema。"""
 from datetime import date, datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -23,6 +23,10 @@ class MemberOut(BaseModel):
         from_attributes = True
 
 
+# ---------- 固定项目角色 ----------
+RoleAssignments = Dict[str, List[int]]
+
+
 # ---------- 项目 ----------
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=128)
@@ -34,6 +38,7 @@ class ProjectCreate(BaseModel):
     description: Optional[str] = None
     node_ids: List[int] = []          # 立项自选的模板节点 id（tr_template_node.id）
     members: List[MemberIn] = []      # 初始成员
+    role_assignments: RoleAssignments = Field(default_factory=dict)
 
 
 class ProjectUpdate(BaseModel):
@@ -44,6 +49,7 @@ class ProjectUpdate(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     description: Optional[str] = None
+    role_assignments: Optional[RoleAssignments] = None
 
 
 class ProjectOut(BaseModel):

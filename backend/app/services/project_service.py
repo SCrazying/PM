@@ -1,12 +1,19 @@
 """项目服务：项目 CRUD、成员、TR 节点实例化、任务。含软删级联与 owner 强制入成员表。"""
 from datetime import date
+import re
 from typing import List, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.responses import BizException, ForbiddenError, NotFoundError
-from app.models.project import Project, ProjectMember, ProjectNode, Task, TrTemplateNode
+from app.core.project_roles import (
+    PROJECT_ROLE_NAMES,
+    SINGLE_PROJECT_ROLES,
+    canonical_project_role,
+    empty_role_assignments,
+)
+from app.models.project import Project, ProjectMember, ProjectNode, ProjectRoleAssignment, Task, TrTemplateNode
 from app.models.user import User
 from app.schemas.project import MemberIn, ProjectCreate, ProjectUpdate, TaskCreate, TaskUpdate
 
@@ -87,6 +94,8 @@ class ProjectService:
             seen.add(m.user_id)
             self._upsert_member(project.id, m.user_id, m.project_role, m.is_invested)
 
+        self.replace_role_assignments(project.id, body.role_assignments)
+
         # TR 节点实例化
         node_ids = body.node_ids or self._default_template_node_ids()
         self._instantiate_nodes(project, node_ids)
@@ -128,6 +137,7 @@ class ProjectService:
         project = self.get_project(project_id)
         self.check_owner(project, user)
         data = body.model_dump(exclude_none=True)
+        role_assignments = data.pop("role_assignments", None)
         # 负责人变更：同步成员表
         if "owner_id" in data and data["owner_id"] != project.owner_id:
             new_owner = self.db.get(User, data["owner_id"])
@@ -136,6 +146,8 @@ class ProjectService:
             self._upsert_member(project.id, data["owner_id"], "负责人", True)
         for f, v in data.items():
             setattr(project, f, v)
+        if role_assignments is not None:
+            self.replace_role_assignments(project.id, role_assignments)
         self.db.commit()
         self.db.refresh(project)
         return project
@@ -186,7 +198,113 @@ class ProjectService:
         self.db.flush()
         return m
 
+    def _normalize_role_assignments(self, assignments: Optional[dict]) -> dict[str, list[int]]:
+        normalized = empty_role_assignments()
+        if not assignments:
+            return normalized
+        if not isinstance(assignments, dict):
+            raise BizException("项目角色格式不正确")
+
+        for raw_role, raw_user_ids in assignments.items():
+            role = canonical_project_role(raw_role)
+            if role not in PROJECT_ROLE_NAMES:
+                raise BizException(f"不支持的项目角色：{raw_role}")
+            if raw_user_ids is None:
+                user_ids = []
+            elif isinstance(raw_user_ids, (list, tuple, set)):
+                user_ids = list(raw_user_ids)
+            else:
+                user_ids = [raw_user_ids]
+
+            for raw_user_id in user_ids:
+                try:
+                    user_id = int(raw_user_id)
+                except (TypeError, ValueError) as exc:
+                    raise BizException(f"{role} 用户格式不正确") from exc
+                if user_id not in normalized[role]:
+                    normalized[role].append(user_id)
+
+            if role in SINGLE_PROJECT_ROLES and len(normalized[role]) > 1:
+                raise BizException(f"{role} 只能选择 1 名用户")
+
+        user_ids = {user_id for ids in normalized.values() for user_id in ids}
+        if user_ids:
+            existing_ids = set(self.db.execute(select(User.id).where(User.id.in_(user_ids))).scalars().all())
+            missing_ids = sorted(user_ids - existing_ids)
+            if missing_ids:
+                raise NotFoundError(f"角色用户不存在：{','.join(map(str, missing_ids))}")
+        return normalized
+
+    def replace_role_assignments(self, project_id: int, assignments: Optional[dict]) -> dict[str, list[int]]:
+        """以完整角色集合替换项目角色，并确保角色用户属于项目成员。"""
+        normalized = self._normalize_role_assignments(assignments)
+        current = self.db.execute(
+            select(ProjectRoleAssignment).where(ProjectRoleAssignment.project_id == project_id)
+        ).scalars().all()
+        for row in current:
+            self.db.delete(row)
+
+        roles_by_user: dict[int, list[str]] = {}
+        for role, user_ids in normalized.items():
+            for user_id in user_ids:
+                roles_by_user.setdefault(user_id, []).append(role)
+                self.db.add(ProjectRoleAssignment(project_id=project_id, role=role, user_id=user_id))
+
+        # 清理旧的兼容字段，避免编辑时清空角色后又被旧字段兜底恢复。
+        members = self.db.execute(
+            select(ProjectMember).where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.is_deleted.is_(False),
+            )
+        ).scalars().all()
+        for member in members:
+            if member.user_id in roles_by_user or not member.project_role:
+                continue
+            legacy_parts = re.split(r"[、,，;；]+", member.project_role)
+            kept_parts = [part.strip() for part in legacy_parts if part.strip() and not canonical_project_role(part)]
+            member.project_role = "、".join(kept_parts) or None
+
+        # 角色用户自动成为项目成员，保留已有成员的投入状态。
+        for user_id, roles in roles_by_user.items():
+            member = self.db.execute(
+                select(ProjectMember).where(
+                    ProjectMember.project_id == project_id,
+                    ProjectMember.user_id == user_id,
+                )
+            ).scalar_one_or_none()
+            invested = member.is_invested if member else True
+            self._upsert_member(project_id, user_id, "、".join(roles), invested)
+        self.db.flush()
+        return normalized
+
+    def list_role_assignments(self, project_id: int) -> dict[str, list[int]]:
+        result = empty_role_assignments()
+        rows = self.db.execute(
+            select(ProjectRoleAssignment).where(ProjectRoleAssignment.project_id == project_id)
+        ).scalars().all()
+        for row in rows:
+            if row.user_id not in result[row.role]:
+                result[row.role].append(row.user_id)
+
+        # 兼容旧数据：迁移前使用 project_member.project_role 的固定角色。
+        members = self.db.execute(
+            select(ProjectMember).where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.is_deleted.is_(False),
+            )
+        ).scalars().all()
+        for member in members:
+            role = canonical_project_role(member.project_role)
+            if role and member.user_id not in result[role]:
+                result[role].append(member.user_id)
+        return result
+
     def list_members(self, project_id: int) -> list:
+        role_assignments = self.list_role_assignments(project_id)
+        roles_by_user = {}
+        for role, user_ids in role_assignments.items():
+            for user_id in user_ids:
+                roles_by_user.setdefault(user_id, []).append(role)
         rows = self.db.execute(
             select(ProjectMember, User.display_name)
             .join(User, User.id == ProjectMember.user_id)
@@ -194,8 +312,11 @@ class ProjectService:
         ).all()
         out = []
         for m, dname in rows:
+            roles = roles_by_user.get(m.user_id, [])
             out.append({"id": m.id, "user_id": m.user_id, "project_role": m.project_role,
-                        "is_invested": m.is_invested, "display_name": dname})
+                        "roles": roles, "is_invested": m.is_invested, "display_name": dname})
+            if roles:
+                out[-1]["project_role"] = "、".join(roles)
         return out
 
     def add_member(self, project_id: int, body: MemberIn, user: dict) -> None:

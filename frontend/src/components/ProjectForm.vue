@@ -21,6 +21,26 @@
           <el-option v-for="u in users" :key="u.id" :label="u.display_name" :value="u.id" />
         </el-select>
       </el-form-item>
+      <el-form-item label="项目角色">
+        <el-row :gutter="10" class="role-grid">
+          <el-col v-for="role in roleOptions" :key="role.key" :span="12">
+            <div class="role-field">
+              <span class="role-label">{{ role.label }}</span>
+              <el-select
+                v-model="form.role_assignments[role.key]"
+                :multiple="role.multiple"
+                :collapse-tags="role.multiple"
+                :collapse-tags-tooltip="role.multiple"
+                clearable filterable
+                :placeholder="role.multiple ? '可多选用户' : '可选 1 名用户'"
+                style="width: 100%"
+              >
+                <el-option v-for="u in users" :key="u.id" :label="u.display_name" :value="u.id" />
+              </el-select>
+            </div>
+          </el-col>
+        </el-row>
+      </el-form-item>
       <el-row :gutter="12">
         <el-col :span="12">
           <el-form-item label="开始日期">
@@ -73,11 +93,42 @@ const editId = ref(null)
 const formRef = ref()
 const users = ref([])
 const templates = ref([])
+const roleOptions = [
+  { key: 'SE', label: 'SE', multiple: false },
+  { key: 'TPM', label: 'TPM', multiple: false },
+  { key: 'TL/FO', label: 'TL/FO', multiple: true },
+  { key: 'CodeReview', label: 'CodeReview', multiple: true },
+]
+
+function emptyRoleAssignments() {
+  return { SE: null, TPM: null, 'TL/FO': [], CodeReview: [] }
+}
+
+function roleAssignmentPayload() {
+  const result = {}
+  for (const role of roleOptions) {
+    const value = form.role_assignments[role.key]
+    result[role.key] = role.multiple
+      ? (Array.isArray(value) ? [...value] : [])
+      : (value === null || value === undefined || value === '' ? [] : [value])
+  }
+  return result
+}
+
+function setRoleAssignments(value) {
+  const source = value || {}
+  const next = emptyRoleAssignments()
+  for (const role of roleOptions) {
+    const ids = Array.isArray(source[role.key]) ? source[role.key] : []
+    next[role.key] = role.multiple ? [...ids] : (ids[0] ?? null)
+  }
+  form.role_assignments = next
+}
 
 const form = reactive({
   name: '', code: '', machine_model: '', owner_id: null,
   start_date: null, end_date: null, description: '',
-  template_id: null, node_ids: [],
+  template_id: null, node_ids: [], role_assignments: emptyRoleAssignments(),
 })
 
 const rules = {
@@ -108,11 +159,15 @@ async function open(project) {
       owner_id: project.owner_id, start_date: project.start_date, end_date: project.end_date,
       description: project.description, template_id: null, node_ids: [],
     })
+    setRoleAssignments(project.role_assignments)
   } else {
     editId.value = null
-    Object.assign(form, { name: '', code: '', machine_model: '', owner_id: null, start_date: null, end_date: null, description: '', node_ids: [] })
-    if (templates.value.length && !form.template_id) {
-      form.template_id = templates.value[0].id
+    Object.assign(form, {
+      name: '', code: '', machine_model: '', owner_id: null, start_date: null, end_date: null,
+      description: '', template_id: templates.value[0]?.id || null, node_ids: [],
+    })
+    setRoleAssignments()
+    if (form.template_id) {
       onTemplateChange()
     }
   }
@@ -126,13 +181,14 @@ async function onSubmit() {
       await updateProject(editId.value, {
         name: form.name, machine_model: form.machine_model, owner_id: form.owner_id,
         start_date: form.start_date, end_date: form.end_date, description: form.description,
+        role_assignments: roleAssignmentPayload(),
       })
       ElMessage.success('已更新')
     } else {
       await createProject({
         name: form.name, code: form.code, machine_model: form.machine_model, owner_id: form.owner_id,
         start_date: form.start_date, end_date: form.end_date, description: form.description,
-        node_ids: form.node_ids, members: [],
+        node_ids: form.node_ids, members: [], role_assignments: roleAssignmentPayload(),
       })
       ElMessage.success('已创建')
     }
@@ -150,4 +206,7 @@ defineExpose({ open })
 .node-box { width: 100%; }
 .node-checks { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; }
 .node-tip { color: #909399; font-size: 12px; margin-top: 4px; }
+.role-grid { width: 100%; row-gap: 8px; }
+.role-field { display: flex; align-items: center; gap: 6px; }
+.role-label { width: 68px; color: var(--pm-text-2); font-size: 13px; flex: none; }
 </style>

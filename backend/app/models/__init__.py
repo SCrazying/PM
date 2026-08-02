@@ -15,6 +15,7 @@ from app.models.project import (
     Project,
     ProjectMember,
     ProjectNode,
+    ProjectRoleAssignment,
     Task,
     TrTemplate,
     TrTemplateNode,
@@ -24,7 +25,7 @@ from app.models.user import AuthToken, PasswordReset, User
 __all__ = [
     "Base",
     "User", "AuthToken", "PasswordReset",
-    "Project", "ProjectMember", "TrTemplate", "TrTemplateNode", "ProjectNode", "NodeReview", "Task",
+    "Project", "ProjectMember", "ProjectRoleAssignment", "TrTemplate", "TrTemplateNode", "ProjectNode", "NodeReview", "Task",
     "Progress", "ProgressTaskLink", "ProjectWeeklyGoal", "Attachment",
     "AiSummary", "AuditLog", "Config", "Notification",
 ]

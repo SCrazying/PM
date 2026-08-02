@@ -8,9 +8,11 @@ from openpyxl import load_workbook
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.project_roles import PROJECT_ROLE_NAMES, canonical_project_role, empty_role_assignments
 from app.models.project import Project, ProjectMember, ProjectNode, Task, TrTemplate, TrTemplateNode
 from app.models.user import User
 from app.services.progress_service import ProgressService
+from app.services.project_service import ProjectService
 
 # 节点关键词映射（可配置化）
 NODE_KEYWORDS = {
@@ -22,6 +24,7 @@ NODE_KEYWORDS = {
     "TR6": ["tr6", "收尾", "量产"],
 }
 OWNER_KEYWORDS = ["负责人", "pm", "owner", "项目经理"]
+OWNER_LABELS = {"负责人", "owner", "pm", "项目经理"}
 
 
 def _match_node_key(text: str) -> Optional[str]:
@@ -39,6 +42,47 @@ def _split_tasks(text: str) -> list[str]:
         return []
     parts = re.split(r"[\n；;、]|(?:\d+[.、\)])", str(text))
     return [p.strip() for p in parts if p and p.strip()]
+
+
+def _split_names(text: str) -> list[str]:
+    if not text:
+        return []
+    return [part.strip() for part in re.split(r"[、,，;；\n]+", text) if part and part.strip()]
+
+
+def _parse_role_cell(text: str) -> tuple[dict[str, list[str]], list[str], bool]:
+    """解析“项目角色”单元格，返回固定角色、负责人和是否识别到结构化行。"""
+    roles = {role: [] for role in PROJECT_ROLE_NAMES}
+    owners = []
+    if not text:
+        return roles, owners, False
+
+    # Excel 通常传入实际换行，同时兼容用户手工输入的字面量 \\n / \\N。
+    normalized = str(text).replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\N", "\n")
+    normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
+    detected = False
+    for line in normalized.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        match = re.match(r"^([^:：]+?)\s*[:：]\s*(.*?)\s*$", line)
+        if not match:
+            continue
+        label, names_text = match.groups()
+        names = _split_names(names_text)
+        role = canonical_project_role(label)
+        if role:
+            detected = True
+            for name in names:
+                if name not in roles[role]:
+                    roles[role].append(name)
+            continue
+        if label.strip().casefold() in OWNER_LABELS:
+            detected = True
+            for name in names:
+                if name not in owners:
+                    owners.append(name)
+    return roles, owners, detected
 
 
 class ImportService:
@@ -62,7 +106,31 @@ class ImportService:
                     return str(row[col[n]]).strip()
             return ""
 
-        users_by_name = {u.display_name: u for u in self.db.execute(select(User)).scalars().all()}
+        users_by_name = {u.display_name.strip(): u for u in self.db.execute(select(User)).scalars().all()}
+
+        def add_member(p: dict, name: str, user: Optional[User], role: str, invested: bool, is_owner: bool = False) -> None:
+            identity = user.id if user else f"name:{name}"
+            key = (identity, role)
+            for member in p["members"]:
+                if member["_key"] == key:
+                    member["is_invested"] = invested
+                    member["is_owner"] = member["is_owner"] or is_owner
+                    return
+            p["members"].append({
+                "_key": key,
+                "name": name, "user_id": user.id if user else None, "matched": bool(user),
+                "project_role": role, "is_owner": is_owner, "is_invested": invested,
+            })
+
+        def add_role_assignment(p: dict, role: str, name: str, user: Optional[User], invested: bool) -> None:
+            entries = p["role_assignments"][role]
+            identity = user.id if user else f"name:{name}"
+            if not any(item["_key"] == identity for item in entries):
+                entries.append({
+                    "_key": identity,
+                    "name": name, "user_id": user.id if user else None, "matched": bool(user),
+                })
+            add_member(p, name, user, role, invested)
 
         projects = {}
         warnings, errors = [], []
@@ -75,9 +143,10 @@ class ImportService:
                 warnings.append("存在项目名为空的行，已跳过")
                 continue
             key = f"{machine}|{pname}"
-            person = gv(r, "项目角色", "成员", "姓名", "人员")
+            person = gv(r, "成员", "姓名", "人员")
             invested = gv(r, "是否投入该项目", "是否投入")
             role = gv(r, "项目角色")
+            role_lines, owner_names, role_cell_detected = _parse_role_cell(role)
             node_text = gv(r, "关键节点", "节点", "当前节点")
             week_goal = gv(r, "项目周目标", "周目标")
             week_task = gv(r, "本周任务", "本周工作")
@@ -85,19 +154,35 @@ class ImportService:
             p = projects.setdefault(key, {
                 "name": pname, "machine_model": machine, "code": "",
                 "members": [], "node_text": node_text, "weekly_goal": week_goal,
-                "tasks": [], "warnings": [],
+                "tasks": [], "warnings": [], "role_assignments": empty_role_assignments(),
+                "role_assignments_detected": False,
             })
             if week_goal and not p["weekly_goal"]:
                 p["weekly_goal"] = week_goal
+
+            if role_cell_detected:
+                p["role_assignments_detected"] = True
+                role_invested = invested not in ("否", "N", "n", "0") if invested else True
+                for role_name, names in role_lines.items():
+                    for name in names:
+                        add_role_assignment(p, role_name, name, users_by_name.get(name), role_invested)
+                for name in owner_names:
+                    add_member(p, name, users_by_name.get(name), "负责人", role_invested, is_owner=True)
+
+            # 兼容旧模板：成员姓名单独在“成员/姓名/人员”列中。
+            if not person and role and not role_cell_detected:
+                if not canonical_project_role(role) and role.strip().casefold() not in OWNER_LABELS:
+                    person, role = role, "成员"
             if person:
                 u = users_by_name.get(person)
                 is_owner = any(k in (role or "").lower() for k in OWNER_KEYWORDS)
-                p["members"].append({
-                    "name": person, "user_id": u.id if u else None, "matched": bool(u),
-                    "project_role": role or ("负责人" if is_owner else "成员"),
-                    "is_owner": is_owner,
-                    "is_invested": invested not in ("否", "N", "n", "0", ""),
-                })
+                member_role = role or ("负责人" if is_owner else "成员")
+                member_invested = invested not in ("否", "N", "n", "0", "")
+                add_member(p, person, u, member_role, member_invested, is_owner=is_owner)
+                fixed_role = canonical_project_role(role)
+                if fixed_role:
+                    p["role_assignments_detected"] = True
+                    add_role_assignment(p, fixed_role, person, u, member_invested)
             for t in _split_tasks(week_task):
                 if t not in p["tasks"]:
                     p["tasks"].append(t)
@@ -106,7 +191,7 @@ class ImportService:
         for p in projects.values():
             node_key = _match_node_key(p["node_text"])
             owners = [m for m in p["members"] if m["is_owner"]]
-            unmatched = [m["name"] for m in p["members"] if not m["matched"]]
+            unmatched = list(dict.fromkeys(m["name"] for m in p["members"] if not m["matched"]))
             warns = []
             if not node_key:
                 warns.append(f"关键节点「{p['node_text']}」无法识别，需人工指定")
@@ -114,6 +199,11 @@ class ImportService:
                 warns.append("识别到多个负责人，请确认")
             if unmatched:
                 warns.append(f"成员未匹配到用户：{','.join(unmatched)}")
+            for member in p["members"]:
+                member.pop("_key", None)
+            for entries in p["role_assignments"].values():
+                for entry in entries:
+                    entry.pop("_key", None)
             out.append({**p, "current_node_key": node_key, "warnings": warns})
         return {"projects": out, "warnings": warnings, "errors": errors,
                 "week_start": self.ps.week_start_of(date.today())}
@@ -168,6 +258,20 @@ class ImportService:
                 self.db.add(ProjectMember(project_id=proj.id, user_id=m["user_id"], project_role=role,
                                           is_invested=m.get("is_invested", True), joined_at=date.today()))
         proj.owner_id = owner_id
+
+        if p.get("role_assignments_detected"):
+            role_ids = {}
+            for raw_role, entries in (p.get("role_assignments") or {}).items():
+                role = canonical_project_role(raw_role)
+                if not role:
+                    continue
+                ids = []
+                for entry in entries or []:
+                    user_id = entry.get("user_id") if isinstance(entry, dict) else entry
+                    if user_id and int(user_id) not in ids:
+                        ids.append(int(user_id))
+                role_ids[role] = ids
+            ProjectService(self.db).replace_role_assignments(proj.id, role_ids)
 
         # 节点：按模板全量实例化，当前节点置为匹配到的
         current_key = p.get("current_node_key")

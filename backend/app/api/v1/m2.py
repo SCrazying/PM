@@ -2,6 +2,7 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -76,6 +77,20 @@ def group_weekly(view: str = Query("project"), week_start: date = Query(...), us
     if view == "person":
         return ok(svc.group_weekly_by_person(week_start))
     return ok(svc.group_weekly_by_project(week_start))
+
+
+@router.get("/reports/group/ledger/export")
+def export_ledger(week_start: date = Query(...), user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """导出固定 7 列项目台账，按项目成员一行。"""
+    from urllib.parse import quote
+    filename = f"项目台账_{week_start.isocalendar().year}年第{week_start.isocalendar().week:02d}周.xlsx"
+    output = ReportService(db).export_ledger_xlsx(week_start)
+    record_audit(db, user["user_id"], "export", "project_ledger", None, {"week_start": str(week_start)})
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
 
 
 # ---------- 看板 ----------

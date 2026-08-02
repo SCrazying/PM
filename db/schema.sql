@@ -98,6 +98,19 @@ CREATE UNIQUE INDEX ux_member ON project_member(project_id, user_id) WHERE NOT i
 CREATE INDEX ix_member_user   ON project_member(user_id) WHERE NOT is_deleted;  -- 查"我参与的项目/按人周报/绩效"
 COMMENT ON TABLE project_member IS '项目成员（project.owner_id 必须也在此表，应用层保证）';
 
+CREATE TABLE project_role_assignment (
+    id           BIGSERIAL PRIMARY KEY,
+    project_id   BIGINT NOT NULL REFERENCES project(id) ON DELETE RESTRICT,
+    role         VARCHAR(32) NOT NULL,                     -- SE / TPM / TL/FO / CodeReview
+    user_id      BIGINT NOT NULL REFERENCES "user"(id) ON DELETE RESTRICT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_project_role_assignment_role CHECK (role IN ('SE', 'TPM', 'TL/FO', 'CodeReview')),
+    CONSTRAINT ux_project_role_assignment UNIQUE (project_id, role, user_id)
+);
+CREATE INDEX ix_project_role_assignment_project ON project_role_assignment(project_id);
+CREATE INDEX ix_project_role_assignment_user ON project_role_assignment(user_id);
+COMMENT ON TABLE project_role_assignment IS '项目固定角色分配';
+
 -- ---------------------------------------------------------------------
 -- 3. TR 模板与项目节点
 -- ---------------------------------------------------------------------

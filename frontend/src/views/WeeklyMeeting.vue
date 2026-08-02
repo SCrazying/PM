@@ -5,6 +5,9 @@
       <el-date-picker v-model="weekStart" type="week" format="YYYY 第 ww 周" value-format="YYYY-MM-DD"
                       style="width: 180px" @change="load" />
       <div style="flex:1"></div>
+      <el-button type="success" :loading="exporting" @click="downloadLedger">
+        <el-icon style="margin-right:5px"><Download /></el-icon>导出项目台账
+      </el-button>
       <el-radio-group v-model="view" @change="load">
         <el-radio-button value="project">按项目</el-radio-button>
         <el-radio-button value="person">按人</el-radio-button>
@@ -106,7 +109,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { groupWeekly, projectWeekly, listProjects } from '../api'
+import { groupWeekly, projectWeekly, listProjects, exportLedger } from '../api'
 
 const today = new Date().toISOString().slice(0, 10)
 const weekStart = ref(today)
@@ -115,6 +118,7 @@ const loading = ref(false)
 const projectReports = ref([])
 const personReports = ref([])
 const activeProjects = ref([])
+const exporting = ref(false)
 
 const healthDot = (h) => ({ on_track: 'success', at_risk: 'warning', delayed: 'danger' }[h] || 'info')
 const taskTag = (t) => (t.status === 'done' ? 'success' : t.overdue ? 'danger' : t.status === 'in_progress' ? 'primary' : 'info')
@@ -136,6 +140,22 @@ async function load() {
     }
   } finally { loading.value = false }
 }
+async function downloadLedger() {
+  exporting.value = true
+  try {
+    const response = await exportLedger(weekStart.value)
+    const blob = new Blob([response], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `项目台账_${weekStart.value}.xlsx`
+    link.click()
+    URL.revokeObjectURL(url)
+  } finally {
+    exporting.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
