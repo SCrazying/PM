@@ -16,7 +16,7 @@
             <div class="proj-comp-num">{{ projComp.percent }}<span class="pc-pct">%</span></div>
             <div class="proj-comp-label">项目完成度 {{ projComp.passed }}/{{ projComp.total }} 节点</div>
           </div>
-          <el-button @click="editVisible = true">编辑</el-button>
+          <el-button @click="openProjectEdit">编辑</el-button>
           <el-button @click="$router.back()">返回</el-button>
         </div>
       </div>
@@ -227,12 +227,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addMember, addReview, createTask, deleteTask, getProject, getWeeklyGoal, listMembers, listProgress,
-  listReviews, listTasks, listUsers, nodeAdvance, nodeComplete, nodeCompletion, projectCompletion,
+  listReviews, listTasks, listUserOptions, nodeAdvance, nodeComplete, nodeCompletion, projectCompletion,
   removeMember, setTaskStatus, setWeeklyGoal, updateProgress, updateTask,
 } from '../api'
 import { useUserStore } from '../store/user'
@@ -267,7 +267,6 @@ const reviewVisible = ref(false)
 const reviewForm = reactive({ conclusion: 'pass', comment: '' })
 const goalVisible = ref(false)
 const goalText = ref('')
-const editVisible = ref(false)
 const editFormRef = ref()
 
 const ownerName = computed(() => userName(project.value?.owner_id))
@@ -302,7 +301,7 @@ async function loadAll() {
     project.value = await getProject(pid)
     nodes.value = project.value.nodes || []
     members.value = await listMembers(pid)
-    if (!users.value.length) users.value = await listUsers()
+    if (!users.value.length) users.value = await listUserOptions()
     if (!currentNode.value && nodes.value.length) {
       currentNode.value = nodes.value.find((n) => n.id === project.value.current_node_id) || nodes.value[0]
     }
@@ -418,8 +417,9 @@ async function onRemoveMember(row) {
   await removeMember(pid, row.id); members.value = await listMembers(pid)
 }
 
-// 编辑项目复用 ProjectForm
-watch(editVisible, (v) => { if (v) { editFormRef.value.open(project.value); editVisible.value = false } })
+async function openProjectEdit() {
+  if (project.value && editFormRef.value) await editFormRef.value.open(project.value)
+}
 
 onMounted(loadAll)
 </script>

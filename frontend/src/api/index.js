@@ -64,6 +64,7 @@ export const downloadAttachment = (id) => `/api/v1/attachments/${id}/download`
 
 // 用户 / 配置 / 备份 / 导入
 export const listUsers = () => request.get('/users')
+export const listUserOptions = () => request.get('/users/options')
 export const createUser = (data) => request.post('/users', data)
 export const updateUser = (id, data) => request.put(`/users/${id}`, data)
 export const setUserStatus = (id, status) => request.patch(`/users/${id}/status`, { status })

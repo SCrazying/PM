@@ -68,16 +68,24 @@
             </el-checkbox>
           </el-checkbox-group>
           <div v-if="selectedTemplateNodes.length" class="node-plans">
-            <div class="node-plan-title">节点计划时间（开始和完成日期均必填）</div>
+            <div class="node-plan-title">节点计划完成时间（截止日期必填）</div>
             <div v-for="n in selectedTemplateNodes" :key="n.id" class="node-plan-row">
               <span class="node-plan-name">{{ n.node_key }} {{ n.name }}</span>
-              <el-date-picker v-model="form.node_plans[n.id].planned_start" type="date" value-format="YYYY-MM-DD" placeholder="计划开始" />
-              <span class="node-plan-arrow">→</span>
               <el-date-picker v-model="form.node_plans[n.id].planned_end" type="date" value-format="YYYY-MM-DD" placeholder="计划完成" />
               <el-tag v-if="isNodePlanOverdue(form.node_plans[n.id])" size="small" type="warning">已超期</el-tag>
             </div>
           </div>
           <div class="node-tip">勾选本项目需要做的 TR 节点（默认全选）</div>
+        </div>
+      </el-form-item>
+      <el-form-item v-if="isEdit && editableProjectNodes.length" label="节点截止时间">
+        <div class="node-box">
+          <div class="node-plan-title">可修改计划完成日期；历史实际完成日期不变</div>
+          <div v-for="n in editableProjectNodes" :key="n.id" class="node-plan-row">
+            <span class="node-plan-name">{{ n.node_key }} {{ n.name }}</span>
+            <el-date-picker v-model="form.node_deadlines[n.id]" type="date" value-format="YYYY-MM-DD" placeholder="计划完成" clearable />
+            <el-tag v-if="isDeadlineOverdue(form.node_deadlines[n.id])" size="small" type="warning">已超期</el-tag>
+          </div>
         </div>
       </el-form-item>
     </el-form>
@@ -92,7 +100,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { createProject, listTemplates, listUsers, updateProject } from '../api'
+import { createProject, listTemplates, listUserOptions, updateProject } from '../api'
 
 const emit = defineEmits(['saved'])
 
@@ -103,6 +111,7 @@ const editId = ref(null)
 const formRef = ref()
 const users = ref([])
 const templates = ref([])
+const projectNodes = ref([])
 const roleOptions = [
   { key: 'SE', label: 'SE', multiple: false },
   { key: 'TPM', label: 'TPM', multiple: false },
@@ -138,7 +147,7 @@ function setRoleAssignments(value) {
 const form = reactive({
   name: '', code: '', machine_model: '', owner_id: null,
   start_date: null, end_date: null, description: '',
-  template_id: null, node_ids: [], node_plans: {}, role_assignments: emptyRoleAssignments(),
+  template_id: null, node_ids: [], node_plans: {}, node_deadlines: {}, role_assignments: emptyRoleAssignments(),
 })
 
 const rules = {
@@ -153,6 +162,7 @@ const templateNodes = computed(() => {
 })
 
 const selectedTemplateNodes = computed(() => templateNodes.value.filter((n) => form.node_ids.includes(n.id)))
+const editableProjectNodes = computed(() => projectNodes.value)
 
 function ensureNodePlans() {
   const next = {}
@@ -160,7 +170,6 @@ function ensureNodePlans() {
     const current = form.node_plans[n.id] || {}
     next[n.id] = {
       template_node_id: n.id,
-      planned_start: current.planned_start || null,
       planned_end: current.planned_end || null,
     }
   }
@@ -180,41 +189,55 @@ function isNodePlanOverdue(plan) {
   return Boolean(plan?.planned_end && plan.planned_end < new Date().toISOString().slice(0, 10))
 }
 
+function isDeadlineOverdue(deadline) {
+  return Boolean(deadline && deadline < new Date().toISOString().slice(0, 10))
+}
+
 function nodePlanPayload() {
   return selectedTemplateNodes.value.map((n) => ({ ...form.node_plans[n.id], template_node_id: n.id }))
+}
+
+function nodeDeadlinePayload() {
+  return editableProjectNodes.value.map((n) => ({
+    project_node_id: n.id,
+    planned_end: form.node_deadlines[n.id] || null,
+  }))
 }
 
 function validateNodePlans() {
   const invalid = selectedTemplateNodes.value.find((n) => {
     const plan = form.node_plans[n.id]
-    return !plan?.planned_start || !plan?.planned_end || plan.planned_end < plan.planned_start
+    return !plan?.planned_end
   })
   if (invalid) {
-    ElMessage.warning(`请补齐节点“${invalid.node_key} ${invalid.name}”的计划日期，且完成日期不能早于开始日期`)
+    ElMessage.warning(`请补齐节点“${invalid.node_key} ${invalid.name}”的计划完成日期`)
     return false
   }
   return true
 }
 
 async function open(project) {
-  visible.value = true
   isEdit.value = !!project
-  if (!users.value.length) users.value = await listUsers()
-  if (!templates.value.length) templates.value = await listTemplates()
+  if (!users.value.length) users.value = await listUserOptions()
+  if (!project && !templates.value.length) templates.value = await listTemplates()
+  visible.value = true
 
   if (project) {
     editId.value = project.id
+    projectNodes.value = project.nodes || []
     Object.assign(form, {
       name: project.name, code: project.code, machine_model: project.machine_model,
       owner_id: project.owner_id, start_date: project.start_date, end_date: project.end_date,
       description: project.description, template_id: null, node_ids: [], node_plans: {},
+      node_deadlines: Object.fromEntries((project.nodes || []).map((node) => [node.id, node.planned_end || null])),
     })
     setRoleAssignments(project.role_assignments)
   } else {
     editId.value = null
+    projectNodes.value = []
     Object.assign(form, {
       name: '', code: '', machine_model: '', owner_id: null, start_date: null, end_date: null,
-      description: '', template_id: templates.value[0]?.id || null, node_ids: [], node_plans: {},
+      description: '', template_id: templates.value[0]?.id || null, node_ids: [], node_plans: {}, node_deadlines: {},
     })
     setRoleAssignments()
     if (form.template_id) {
@@ -232,7 +255,7 @@ async function onSubmit() {
       await updateProject(editId.value, {
         name: form.name, machine_model: form.machine_model, owner_id: form.owner_id,
         start_date: form.start_date, end_date: form.end_date, description: form.description,
-        role_assignments: roleAssignmentPayload(),
+        role_assignments: roleAssignmentPayload(), node_deadlines: nodeDeadlinePayload(),
       })
       ElMessage.success('已更新')
     } else {

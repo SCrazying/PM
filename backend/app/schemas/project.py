@@ -7,7 +7,13 @@ from pydantic import BaseModel, Field
 
 class NodePlanIn(BaseModel):
     template_node_id: int
+    # 旧客户端兼容字段；新建页面只提交 planned_end。
     planned_start: Optional[date] = None
+    planned_end: Optional[date] = None
+
+
+class NodeDeadlineIn(BaseModel):
+    project_node_id: int
     planned_end: Optional[date] = None
 
 
@@ -57,6 +63,7 @@ class ProjectUpdate(BaseModel):
     end_date: Optional[date] = None
     description: Optional[str] = None
     role_assignments: Optional[RoleAssignments] = None
+    node_deadlines: Optional[List[NodeDeadlineIn]] = None
 
 
 class ProjectOut(BaseModel):

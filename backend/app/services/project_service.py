@@ -106,10 +106,10 @@ class ProjectService:
             invalid = [
                 plan for plan in plans.values()
                 if plan.template_node_id in body.node_ids
-                and (not plan.planned_start or not plan.planned_end or plan.planned_end < plan.planned_start)
+                and (not plan.planned_end or (plan.planned_start and plan.planned_end < plan.planned_start))
             ]
             if invalid:
-                raise BizException("节点计划日期不完整或完成日期早于开始日期")
+                raise BizException("节点计划完成日期不能为空")
         self._instantiate_nodes(project, node_ids, body.node_plans)
 
         self.db.commit()
@@ -154,6 +154,7 @@ class ProjectService:
         self.check_owner(project, user)
         data = body.model_dump(exclude_none=True)
         role_assignments = data.pop("role_assignments", None)
+        node_deadlines = data.pop("node_deadlines", None)
         # 负责人变更：同步成员表
         if "owner_id" in data and data["owner_id"] != project.owner_id:
             new_owner = self.db.get(User, data["owner_id"])
@@ -164,9 +165,33 @@ class ProjectService:
             setattr(project, f, v)
         if role_assignments is not None:
             self.replace_role_assignments(project.id, role_assignments)
+        if node_deadlines is not None:
+            self.replace_node_deadlines(project.id, node_deadlines)
         self.db.commit()
         self.db.refresh(project)
         return project
+
+    def replace_node_deadlines(self, project_id: int, deadlines: list[dict]) -> None:
+        """只替换项目节点的计划完成日期，不改动旧的计划开始日期。"""
+        nodes = {
+            node.id: node for node in self.db.execute(
+                select(ProjectNode).where(
+                    ProjectNode.project_id == project_id,
+                    ProjectNode.is_deleted.is_(False),
+                )
+            ).scalars().all()
+        }
+        seen = set()
+        for item in deadlines or []:
+            node_id = item["project_node_id"]
+            if node_id in seen:
+                raise BizException("节点截止日期不能重复提交")
+            seen.add(node_id)
+            node = nodes.get(node_id)
+            if not node:
+                raise BizException("节点不属于当前项目")
+            node.planned_end = item.get("planned_end")
+        self.db.flush()
 
     def archive_project(self, project_id: int, user: dict, archive: bool = True) -> Project:
         project = self.get_project(project_id)

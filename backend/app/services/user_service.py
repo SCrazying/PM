@@ -15,6 +15,11 @@ class UserService:
     def list_users(self) -> list[User]:
         return list(self.db.execute(select(User).order_by(User.id)).scalars().all())
 
+    def list_user_options(self) -> list[User]:
+        return list(self.db.execute(
+            select(User).where(User.status == "active").order_by(User.display_name, User.id)
+        ).scalars().all())
+
     def create(self, body: UserCreate) -> User:
         exists = self.db.execute(select(User).where(User.username == body.username)).scalar_one_or_none()
         if exists:

@@ -9,7 +9,7 @@ APP_USER="${APP_USER:-pm}"
 DB_NAME="${DB_NAME:-pm_system}"
 DB_USER="${DB_USER:-pm}"
 DB_PASSWORD="${DB_PASSWORD:-pm123}"
-BACKEND_PORT="${BACKEND_PORT:-8001}"
+BACKEND_PORT="${BACKEND_PORT:-8000}"
 
 echo "==> 部署目录: $DEPLOY_DIR"
 echo "==> 安装目标: $APP_HOME (用户 $APP_USER)"

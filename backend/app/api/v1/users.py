@@ -1,15 +1,20 @@
-"""用户管理路由（管理员）。"""
+"""用户管理路由；用户选择项对已登录用户开放，管理操作仍需管理员。"""
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import require_admin
+from app.core.deps import get_current_user, require_admin
 from app.core.responses import ok
 from app.schemas.user import ResetPasswordRequest, StatusUpdate, UserCreate, UserOut, UserUpdate
 from app.services.audit_service import record_audit
 from app.services.user_service import UserService
 
 router = APIRouter()
+
+
+@router.get("/options")
+def list_user_options(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    return ok([{"id": u.id, "display_name": u.display_name, "role": u.role} for u in UserService(db).list_user_options()])
 
 
 @router.get("")
