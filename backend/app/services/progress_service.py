@@ -151,10 +151,16 @@ class ProgressService:
                     Progress.progress_date == today, Progress.is_deleted.is_(False),
                 )
             ).scalars().first() is not None
+            current_node = self.db.get(ProjectNode, proj.current_node_id) if proj.current_node_id else None
             projects.append({
                 "id": proj.id, "name": proj.name, "code": proj.code,
                 "is_invested": mem.is_invested, "filled_today": filled,
                 "current_node_id": proj.current_node_id,
+                "current_node_key": current_node.node_key if current_node else None,
+                "current_node_name": current_node.name if current_node else None,
+                "node_planned_end": current_node.planned_end if current_node else None,
+                "node_overdue": bool(current_node and current_node.status != "passed" and current_node.planned_end and current_node.planned_end < today),
+                "project_role": mem.project_role,
             })
         # 我的未完成任务
         tasks = self.db.execute(
@@ -166,7 +172,25 @@ class ProgressService:
             "planned_end": t.planned_end,
             "overdue": bool(t.planned_end and t.planned_end < today),
         } for t in tasks]
-        return {"date": today, "projects": projects, "tasks": my_tasks}
+        recent_rows = self.db.execute(
+            select(Progress, Project.name, Project.code, ProjectNode.name)
+            .join(Project, Project.id == Progress.project_id)
+            .outerjoin(ProjectNode, ProjectNode.id == Progress.project_node_id)
+            .where(
+                Progress.author_id == user["user_id"],
+                Progress.is_deleted.is_(False),
+                Project.is_deleted.is_(False),
+            )
+            .order_by(Progress.progress_date.desc(), Progress.id.desc())
+            .limit(20)
+        ).all()
+        recent_progress = [{
+            "id": p.id, "project_id": p.project_id, "project_name": project_name,
+            "project_code": project_code, "progress_date": p.progress_date,
+            "project_node_id": p.project_node_id, "node_name": node_name,
+            "today_work": p.today_work, "tomorrow_plan": p.tomorrow_plan, "risk": p.risk,
+        } for p, project_name, project_code, node_name in recent_rows]
+        return {"date": today, "projects": projects, "tasks": my_tasks, "recent_progress": recent_progress}
 
     # ---------- 周目标 ----------
     def get_weekly_goal(self, project_id: int, week_start: date) -> Optional[ProjectWeeklyGoal]:

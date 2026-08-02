@@ -37,7 +37,11 @@ def create_progress(project_id: int, body: ProgressCreate, user: dict = Depends(
 
 @router.put("/progress/{progress_id}")
 def update_progress(progress_id: int, body: ProgressUpdate, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    ProgressService(db).update_progress(progress_id, body, user)
+    from app.models.project import Project
+    progress = ProgressService(db).update_progress(progress_id, body, user)
+    BoardService(db).refresh_health(db.get(Project, progress.project_id))
+    db.commit()
+    record_audit(db, user["user_id"], "update", "progress", str(progress_id), body.model_dump(exclude_none=True))
     return ok(message="已更新")
 
 

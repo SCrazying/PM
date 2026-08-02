@@ -5,6 +5,12 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+class NodePlanIn(BaseModel):
+    template_node_id: int
+    planned_start: Optional[date] = None
+    planned_end: Optional[date] = None
+
+
 # ---------- 项目成员 ----------
 class MemberIn(BaseModel):
     user_id: int
@@ -39,6 +45,7 @@ class ProjectCreate(BaseModel):
     node_ids: List[int] = []          # 立项自选的模板节点 id（tr_template_node.id）
     members: List[MemberIn] = []      # 初始成员
     role_assignments: RoleAssignments = Field(default_factory=dict)
+    node_plans: List[NodePlanIn] = Field(default_factory=list)
 
 
 class ProjectUpdate(BaseModel):
@@ -82,6 +89,7 @@ class NodeOut(BaseModel):
     planned_end: Optional[date]
     actual_start: Optional[date]
     actual_end: Optional[date]
+    overdue: bool = False
 
     class Config:
         from_attributes = True

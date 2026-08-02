@@ -98,7 +98,19 @@ class ProjectService:
 
         # TR 节点实例化
         node_ids = body.node_ids or self._default_template_node_ids()
-        self._instantiate_nodes(project, node_ids)
+        if body.node_ids:
+            plans = {plan.template_node_id: plan for plan in body.node_plans}
+            missing = [node_id for node_id in body.node_ids if node_id not in plans]
+            if missing:
+                raise BizException("请补齐所选节点的计划日期")
+            invalid = [
+                plan for plan in plans.values()
+                if plan.template_node_id in body.node_ids
+                and (not plan.planned_start or not plan.planned_end or plan.planned_end < plan.planned_start)
+            ]
+            if invalid:
+                raise BizException("节点计划日期不完整或完成日期早于开始日期")
+        self._instantiate_nodes(project, node_ids, body.node_plans)
 
         self.db.commit()
         self.db.refresh(project)
@@ -114,17 +126,21 @@ class ProjectService:
             select(TrTemplateNode).where(TrTemplateNode.template_id == tpl.id).order_by(TrTemplateNode.sequence)
         ).scalars().all()]
 
-    def _instantiate_nodes(self, project: Project, template_node_ids: List[int]) -> None:
+    def _instantiate_nodes(self, project: Project, template_node_ids: List[int], node_plans=None) -> None:
         if not template_node_ids:
             return
+        plan_map = {plan.template_node_id: plan for plan in (node_plans or [])}
         nodes = self.db.execute(
             select(TrTemplateNode).where(TrTemplateNode.id.in_(template_node_ids)).order_by(TrTemplateNode.sequence)
         ).scalars().all()
         first_id = None
         for i, tn in enumerate(nodes):
+            plan = plan_map.get(tn.id)
             node = ProjectNode(
                 project_id=project.id, template_node_id=tn.id, node_key=tn.node_key,
                 name=tn.name, sequence=i + 1, status="not_started",
+                planned_start=plan.planned_start if plan else None,
+                planned_end=plan.planned_end if plan else None,
             )
             self.db.add(node)
             self.db.flush()

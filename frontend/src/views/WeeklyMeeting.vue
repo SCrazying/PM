@@ -14,59 +14,94 @@
       </el-radio-group>
     </div>
 
-    <!-- 按项目视图 -->
+    <!-- Excel 风格项目台账：默认不展开，展开行查看周报详情。 -->
     <div v-if="view === 'project'" v-loading="loading">
-      <el-collapse v-model="activeProjects">
-        <el-collapse-item v-for="p in projectReports" :key="p.project.id" :name="p.project.id">
-          <template #title>
-            <div class="proj-title">
-              <span class="pm-dot" :class="healthDot(p.project.health)"></span>
-              <span class="pt-model" v-if="p.project.machine_model">{{ p.project.machine_model }}</span>
-              <span class="pt-name">{{ p.project.name }}</span>
-              <el-tag size="small" effect="plain" v-if="p.project.current_node">{{ p.project.current_node.node_key }}</el-tag>
-              <span class="pt-goal">{{ p.weekly_goal || '（未设周目标）' }}</span>
+      <el-table
+        :data="projectReports"
+        row-key="project.id"
+        border
+        stripe
+        :expand-row-keys="expandedProjects"
+        @expand-change="onExpand"
+      >
+        <el-table-column type="expand" width="46">
+          <template #default="{ row: p }">
+            <div class="report-body">
+              <div class="rb-sec">
+                <div class="rb-h">本周任务（{{ p.tasks.length }}）</div>
+                <el-table :data="p.tasks" size="small" border>
+                  <el-table-column prop="title" label="任务" min-width="180" />
+                  <el-table-column label="状态" width="90">
+                    <template #default="{ row }">
+                      <el-tag size="small" :type="taskTag(row)">{{ taskText(row) }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="planned_end" label="计划完成" width="110" />
+                  <el-table-column prop="actual_end" label="实际完成" width="110">
+                    <template #default="{ row }">{{ row.actual_end || '—' }}</template>
+                  </el-table-column>
+                </el-table>
+              </div>
+              <el-row :gutter="16" style="margin-top:12px">
+                <el-col :span="14">
+                  <div class="rb-h">每日进展</div>
+                  <el-timeline v-if="Object.keys(p.daily).length">
+                    <el-timeline-item v-for="(items, d) in p.daily" :key="d" :timestamp="d" placement="top">
+                      <div v-for="(it, i) in items" :key="i" class="daily-item">
+                        <b>{{ it.author }}</b>：{{ it.today_work }}
+                        <div v-if="it.risk" class="risk">⚠ {{ it.risk }}</div>
+                      </div>
+                    </el-timeline-item>
+                  </el-timeline>
+                  <div v-else class="empty">本周暂无进展记录</div>
+                </el-col>
+                <el-col :span="10">
+                  <div class="rb-h">风险问题</div>
+                  <div v-if="p.risks.length">
+                    <div v-for="(r, i) in p.risks" :key="i" class="risk-item">⚠ [{{ r.date }}] {{ r.author }}：{{ r.risk }}</div>
+                  </div>
+                  <div v-else class="empty">无</div>
+                </el-col>
+              </el-row>
             </div>
           </template>
-          <div class="report-body">
-            <div class="rb-sec">
-              <div class="rb-h">本周任务（{{ p.tasks.length }}）</div>
-              <el-table :data="p.tasks" size="small" border>
-                <el-table-column prop="title" label="任务" min-width="180" />
-                <el-table-column label="状态" width="90">
-                  <template #default="{ row }">
-                    <el-tag size="small" :type="taskTag(row)">{{ taskText(row) }}</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="planned_end" label="计划完成" width="110" />
-                <el-table-column prop="actual_end" label="实际完成" width="110">
-                  <template #default="{ row }">{{ row.actual_end || '—' }}</template>
-                </el-table-column>
-              </el-table>
-            </div>
-            <el-row :gutter="16" style="margin-top:12px">
-              <el-col :span="14">
-                <div class="rb-h">每日进展</div>
-                <el-timeline v-if="Object.keys(p.daily).length">
-                  <el-timeline-item v-for="(items, d) in p.daily" :key="d" :timestamp="d" placement="top">
-                    <div v-for="(it, i) in items" :key="i" class="daily-item">
-                      <b>{{ it.author }}</b>：{{ it.today_work }}
-                      <div v-if="it.risk" class="risk">⚠ {{ it.risk }}</div>
-                    </div>
-                  </el-timeline-item>
-                </el-timeline>
-                <div v-else class="empty">本周暂无进展记录</div>
-              </el-col>
-              <el-col :span="10">
-                <div class="rb-h">风险问题</div>
-                <div v-if="p.risks.length">
-                  <div v-for="(r, i) in p.risks" :key="i" class="risk-item">⚠ [{{ r.date }}] {{ r.author }}：{{ r.risk }}</div>
-                </div>
-                <div v-else class="empty">无</div>
-              </el-col>
-            </el-row>
-          </div>
-        </el-collapse-item>
-      </el-collapse>
+        </el-table-column>
+        <el-table-column label="型号" width="120">
+          <template #default="{ row }">{{ row.project.machine_model || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="项目" min-width="180">
+          <template #default="{ row }">
+            <div class="project-name">{{ row.project.name }}</div>
+            <div class="pm-sub">{{ row.project.code }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="项目角色" min-width="180">
+          <template #default="{ row }">
+            <span class="role-summary">{{ row.project.project_roles || '未分配' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="当前节点" min-width="170">
+          <template #default="{ row }">
+            <template v-if="row.project.current_node">
+              <el-tag size="small" effect="plain">{{ row.project.current_node.node_key }} {{ row.project.current_node.name }}</el-tag>
+              <el-tag v-if="row.project.current_node.overdue" size="small" type="warning" style="margin-left:4px">超期</el-tag>
+              <div v-if="row.project.current_node.planned_end" class="pm-sub node-deadline">计划至 {{ row.project.current_node.planned_end }}</div>
+            </template>
+            <span v-else class="pm-sub">未设置</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="周目标" min-width="180">
+          <template #default="{ row }">{{ row.weekly_goal || '（未设周目标）' }}</template>
+        </el-table-column>
+        <el-table-column label="任务概况" width="100" align="center">
+          <template #default="{ row }">{{ doneTaskCount(row.tasks) }}/{{ row.tasks.length }}</template>
+        </el-table-column>
+        <el-table-column label="健康度" width="90" align="center">
+          <template #default="{ row }">
+            <span class="health-cell"><span class="pm-dot" :class="healthDot(row.project.health)"></span>{{ healthText(row.project.health) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
       <el-empty v-if="!projectReports.length" description="暂无在研项目" />
     </div>
 
@@ -117,12 +152,19 @@ const view = ref('project')
 const loading = ref(false)
 const projectReports = ref([])
 const personReports = ref([])
-const activeProjects = ref([])
+const expandedProjects = ref([])
 const exporting = ref(false)
 
 const healthDot = (h) => ({ on_track: 'success', at_risk: 'warning', delayed: 'danger' }[h] || 'info')
+const healthText = (h) => ({ on_track: '正常', at_risk: '风险', delayed: '延期' }[h] || h)
 const taskTag = (t) => (t.status === 'done' ? 'success' : t.overdue ? 'danger' : t.status === 'in_progress' ? 'primary' : 'info')
-const taskText = (t) => (t.status === 'done' ? '已完成' : t.overdue ? '延期' : t.status === 'in_progress' ? '进行中' : '未开始')
+const taskText = (t) => (t.status === 'done' ? '已完成' : t.overdue ? '逾期' : t.status === 'in_progress' ? '进行中' : '未开始')
+const doneTaskCount = (tasks) => tasks.filter((t) => t.status === 'done').length
+
+function onExpand(row, expandedRows) {
+  const opened = expandedRows.some((item) => item.project.id === row.project.id)
+  expandedProjects.value = opened ? [row.project.id] : []
+}
 
 async function load() {
   loading.value = true
@@ -130,16 +172,17 @@ async function load() {
     if (view.value === 'project') {
       const projects = await listProjects({ status: 'in_progress', size: 100 })
       const reports = []
-      for (const p of projects.list) {
-        reports.push(await projectWeekly(p.id, weekStart.value))
-      }
+      for (const p of projects.list) reports.push(await projectWeekly(p.id, weekStart.value))
       projectReports.value = reports
-      activeProjects.value = reports.map((r) => r.project.id)
+      expandedProjects.value = []
     } else {
       personReports.value = await groupWeekly('person', weekStart.value)
     }
-  } finally { loading.value = false }
+  } finally {
+    loading.value = false
+  }
 }
+
 async function downloadLedger() {
   exporting.value = true
   try {
@@ -160,10 +203,10 @@ onMounted(load)
 </script>
 
 <style scoped>
-.proj-title { display: flex; align-items: center; gap: 8px; width: 100%; }
-.pt-model { background: var(--pm-primary-light); color: var(--pm-primary); font-size: 12px; padding: 1px 8px; border-radius: 6px; }
-.pt-name { font-weight: 700; }
-.pt-goal { color: var(--pm-text-3); font-size: 12px; margin-left: auto; margin-right: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }
+.project-name { font-weight: 700; }
+.role-summary { white-space: pre-line; line-height: 1.45; font-size: 12px; }
+.node-deadline { margin-top: 3px; }
+.health-cell { display: inline-flex; align-items: center; gap: 6px; }
 .report-body { padding: 6px 4px; }
 .rb-sec { margin-bottom: 8px; }
 .rb-h { font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--pm-text-2); }

@@ -62,11 +62,21 @@
           <el-select v-model="form.template_id" placeholder="选择节点模板" style="width: 220px" @change="onTemplateChange">
             <el-option v-for="t in templates" :key="t.id" :label="t.name" :value="t.id" />
           </el-select>
-          <el-checkbox-group v-model="form.node_ids" class="node-checks">
+          <el-checkbox-group v-model="form.node_ids" class="node-checks" @change="onNodeChange">
             <el-checkbox v-for="n in templateNodes" :key="n.id" :value="n.id">
               {{ n.node_key }} {{ n.name }}
             </el-checkbox>
           </el-checkbox-group>
+          <div v-if="selectedTemplateNodes.length" class="node-plans">
+            <div class="node-plan-title">节点计划时间（开始和完成日期均必填）</div>
+            <div v-for="n in selectedTemplateNodes" :key="n.id" class="node-plan-row">
+              <span class="node-plan-name">{{ n.node_key }} {{ n.name }}</span>
+              <el-date-picker v-model="form.node_plans[n.id].planned_start" type="date" value-format="YYYY-MM-DD" placeholder="计划开始" />
+              <span class="node-plan-arrow">→</span>
+              <el-date-picker v-model="form.node_plans[n.id].planned_end" type="date" value-format="YYYY-MM-DD" placeholder="计划完成" />
+              <el-tag v-if="isNodePlanOverdue(form.node_plans[n.id])" size="small" type="warning">已超期</el-tag>
+            </div>
+          </div>
           <div class="node-tip">勾选本项目需要做的 TR 节点（默认全选）</div>
         </div>
       </el-form-item>
@@ -128,7 +138,7 @@ function setRoleAssignments(value) {
 const form = reactive({
   name: '', code: '', machine_model: '', owner_id: null,
   start_date: null, end_date: null, description: '',
-  template_id: null, node_ids: [], role_assignments: emptyRoleAssignments(),
+  template_id: null, node_ids: [], node_plans: {}, role_assignments: emptyRoleAssignments(),
 })
 
 const rules = {
@@ -142,8 +152,48 @@ const templateNodes = computed(() => {
   return t ? t.nodes : []
 })
 
+const selectedTemplateNodes = computed(() => templateNodes.value.filter((n) => form.node_ids.includes(n.id)))
+
+function ensureNodePlans() {
+  const next = {}
+  for (const n of selectedTemplateNodes.value) {
+    const current = form.node_plans[n.id] || {}
+    next[n.id] = {
+      template_node_id: n.id,
+      planned_start: current.planned_start || null,
+      planned_end: current.planned_end || null,
+    }
+  }
+  form.node_plans = next
+}
+
 function onTemplateChange() {
   form.node_ids = templateNodes.value.map((n) => n.id) // 默认全选
+  ensureNodePlans()
+}
+
+function onNodeChange() {
+  ensureNodePlans()
+}
+
+function isNodePlanOverdue(plan) {
+  return Boolean(plan?.planned_end && plan.planned_end < new Date().toISOString().slice(0, 10))
+}
+
+function nodePlanPayload() {
+  return selectedTemplateNodes.value.map((n) => ({ ...form.node_plans[n.id], template_node_id: n.id }))
+}
+
+function validateNodePlans() {
+  const invalid = selectedTemplateNodes.value.find((n) => {
+    const plan = form.node_plans[n.id]
+    return !plan?.planned_start || !plan?.planned_end || plan.planned_end < plan.planned_start
+  })
+  if (invalid) {
+    ElMessage.warning(`请补齐节点“${invalid.node_key} ${invalid.name}”的计划日期，且完成日期不能早于开始日期`)
+    return false
+  }
+  return true
 }
 
 async function open(project) {
@@ -157,14 +207,14 @@ async function open(project) {
     Object.assign(form, {
       name: project.name, code: project.code, machine_model: project.machine_model,
       owner_id: project.owner_id, start_date: project.start_date, end_date: project.end_date,
-      description: project.description, template_id: null, node_ids: [],
+      description: project.description, template_id: null, node_ids: [], node_plans: {},
     })
     setRoleAssignments(project.role_assignments)
   } else {
     editId.value = null
     Object.assign(form, {
       name: '', code: '', machine_model: '', owner_id: null, start_date: null, end_date: null,
-      description: '', template_id: templates.value[0]?.id || null, node_ids: [],
+      description: '', template_id: templates.value[0]?.id || null, node_ids: [], node_plans: {},
     })
     setRoleAssignments()
     if (form.template_id) {
@@ -175,6 +225,7 @@ async function open(project) {
 
 async function onSubmit() {
   await formRef.value.validate().catch(() => Promise.reject())
+  if (!isEdit.value && !validateNodePlans()) return
   saving.value = true
   try {
     if (isEdit.value) {
@@ -188,7 +239,7 @@ async function onSubmit() {
       await createProject({
         name: form.name, code: form.code, machine_model: form.machine_model, owner_id: form.owner_id,
         start_date: form.start_date, end_date: form.end_date, description: form.description,
-        node_ids: form.node_ids, members: [], role_assignments: roleAssignmentPayload(),
+        node_ids: form.node_ids, node_plans: nodePlanPayload(), members: [], role_assignments: roleAssignmentPayload(),
       })
       ElMessage.success('已创建')
     }
@@ -206,6 +257,12 @@ defineExpose({ open })
 .node-box { width: 100%; }
 .node-checks { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; }
 .node-tip { color: #909399; font-size: 12px; margin-top: 4px; }
+.node-plans { margin-top: 12px; border-top: 1px solid var(--pm-border); padding-top: 10px; }
+.node-plan-title { color: var(--pm-text-2); font-size: 12px; margin-bottom: 8px; }
+.node-plan-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.node-plan-row :deep(.el-date-editor) { width: 140px; }
+.node-plan-name { width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.node-plan-arrow { color: var(--pm-text-3); }
 .role-grid { width: 100%; row-gap: 8px; }
 .role-field { display: flex; align-items: center; gap: 6px; }
 .role-label { width: 68px; color: var(--pm-text-2); font-size: 13px; flex: none; }

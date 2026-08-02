@@ -26,6 +26,9 @@
         <el-step v-for="n in nodes" :key="n.id" :title="n.node_key" :description="nodeDesc(n)"
                  :status="stepStatus(n)" @click="selectNode(n)" class="step" :class="{ active: currentNode && currentNode.id === n.id }" />
       </el-steps>
+      <el-alert v-if="overdueNodes.length" class="node-alert" type="warning" :closable="false" show-icon>
+        {{ overdueNodes.length }} 个节点已超过计划完成日期，请及时更新节点进度。
+      </el-alert>
     </div>
 
     <el-row :gutter="14" style="margin-top:14px">
@@ -120,7 +123,11 @@
           <div class="card-title" style="margin-bottom:8px">进展时间线</div>
           <el-timeline v-if="progressList.length" class="ptl">
             <el-timeline-item v-for="p in progressList" :key="p.id" :timestamp="`${p.progress_date} · ${p.author_name}`" placement="top">
-              <div class="pl-work">{{ p.today_work }}</div>
+              <div class="progress-head">
+                <div class="pl-work">{{ p.today_work }}</div>
+                <el-button v-if="canEditProgress(p)" link type="primary" size="small" @click="openProgressEdit(p)">编辑</el-button>
+              </div>
+              <div v-if="p.tomorrow_plan" class="pm-sub progress-plan">明日：{{ p.tomorrow_plan }}</div>
               <div v-if="p.risk" class="risk">⚠ {{ p.risk }}</div>
             </el-timeline-item>
           </el-timeline>
@@ -195,6 +202,26 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="progressVisible" title="编辑进展" width="520px">
+      <el-form :model="progressForm" label-width="80px">
+        <el-form-item label="日期"><span>{{ progressForm.progress_date }}</span></el-form-item>
+        <el-form-item label="所属节点"><span>{{ progressForm.node_name || '项目级' }}</span></el-form-item>
+        <el-form-item label="今日进展" required>
+          <el-input v-model="progressForm.today_work" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item label="明日计划">
+          <el-input v-model="progressForm.tomorrow_plan" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="风险问题">
+          <el-input v-model="progressForm.risk" type="textarea" :rows="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="progressVisible = false">取消</el-button>
+        <el-button type="primary" :loading="progressSaving" @click="saveProgressEdit">保存</el-button>
+      </template>
+    </el-dialog>
+
     <ProjectForm ref="editFormRef" @saved="loadAll" />
   </div>
 </template>
@@ -206,7 +233,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addMember, addReview, createTask, deleteTask, getProject, getWeeklyGoal, listMembers, listProgress,
   listReviews, listTasks, listUsers, nodeAdvance, nodeComplete, nodeCompletion, projectCompletion,
-  removeMember, setTaskStatus, setWeeklyGoal, updateTask,
+  removeMember, setTaskStatus, setWeeklyGoal, updateProgress, updateTask,
 } from '../api'
 import { useUserStore } from '../store/user'
 import ProjectForm from '../components/ProjectForm.vue'
@@ -224,6 +251,9 @@ const users = ref([])
 const currentNode = ref(null)
 const reviews = ref([])
 const progressList = ref([])
+const progressVisible = ref(false)
+const progressSaving = ref(false)
+const progressForm = reactive({ id: null, progress_date: '', node_name: '', today_work: '', tomorrow_plan: '', risk: '' })
 const weeklyGoal = ref('')
 const nodeComp = ref({ total: 0, done: 0, percent: 100 })
 const projComp = ref({ total: 0, passed: 0, percent: 0 })
@@ -242,6 +272,7 @@ const editFormRef = ref()
 
 const ownerName = computed(() => userName(project.value?.owner_id))
 const activeStep = computed(() => nodes.value.filter((n) => n.status === 'passed').length)
+const overdueNodes = computed(() => nodes.value.filter((n) => n.overdue))
 const candidateUsers = computed(() => users.value.filter((u) => !members.value.some((m) => m.user_id === u.id)))
 const isLastNode = computed(() => currentNode.value && nodes.value.length && currentNode.value.sequence === Math.max(...nodes.value.map((n) => n.sequence)))
 const canEdit = computed(() => store.isAdmin || project.value?.owner_id === store.userInfo?.id)
@@ -259,7 +290,9 @@ function stepStatus(n) {
   if (n.status === 'failed') return 'error'
   return 'wait'
 }
-function nodeDesc(n) { return n.name }
+function nodeDesc(n) {
+  return n.planned_end ? `${n.name} · 计划至 ${n.planned_end}` : n.name
+}
 function taskTag(row) { if (row.status === 'done') return 'success'; if (row.overdue) return 'danger'; if (row.status === 'in_progress') return 'primary'; return 'info' }
 function taskStatusText(row) { if (row.status === 'done') return '已完成'; if (row.overdue) return '延期'; return row.status === 'in_progress' ? '进行中' : '未开始' }
 
@@ -292,6 +325,42 @@ async function loadGoal() {
 }
 
 function selectNode(n) { currentNode.value = n; loadTasks() }
+
+function canEditProgress(progress) {
+  return store.isAdmin || progress.author_id === store.userInfo?.id
+}
+
+function openProgressEdit(progress) {
+  Object.assign(progressForm, {
+    id: progress.id,
+    progress_date: progress.progress_date,
+    node_name: progress.node_name,
+    today_work: progress.today_work || '',
+    tomorrow_plan: progress.tomorrow_plan || '',
+    risk: progress.risk || '',
+  })
+  progressVisible.value = true
+}
+
+async function saveProgressEdit() {
+  if (!progressForm.today_work.trim()) {
+    ElMessage.warning('请填写今日进展')
+    return
+  }
+  progressSaving.value = true
+  try {
+    await updateProgress(progressForm.id, {
+      today_work: progressForm.today_work,
+      tomorrow_plan: progressForm.tomorrow_plan,
+      risk: progressForm.risk,
+    })
+    ElMessage.success('进展已更新')
+    progressVisible.value = false
+    await loadProgress()
+  } finally {
+    progressSaving.value = false
+  }
+}
 
 async function onCompleteNode() {
   await ElMessageBox.confirm(
@@ -360,6 +429,7 @@ onMounted(loadAll)
 .pname { font-size: 20px; font-weight: 800; display: flex; align-items: center; }
 .pmeta { color: var(--pm-text-3); margin-top: 8px; font-size: 13px; }
 .steps { margin-top: 22px; }
+.node-alert { margin-top: 14px; }
 .step { cursor: pointer; }
 .step.active :deep(.el-step__title) { color: var(--pm-primary); font-weight: 700; }
 .card-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; }
@@ -374,6 +444,8 @@ onMounted(loadAll)
 .m-name { font-size: 14px; font-weight: 600; }
 .ptl { max-height: 320px; overflow-y: auto; }
 .pl-work { font-size: 13px; }
+.progress-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.progress-plan { margin-top: 4px; }
 .risk { color: var(--pm-danger); font-size: 12px; }
 .comp-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 12px; background: #f7f9fc; border-radius: 8px; }
 .comp-label { font-size: 12px; color: var(--pm-text-2); white-space: nowrap; }

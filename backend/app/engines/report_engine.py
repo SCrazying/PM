@@ -58,6 +58,13 @@ class ReportService:
     def project_weekly(self, project_id: int, week_start: date) -> dict:
         ws, we = self._week_range(week_start)
         project = self.db.get(Project, project_id)
+        project_members = self.db.execute(
+            select(ProjectMember, User.display_name)
+            .join(User, User.id == ProjectMember.user_id)
+            .where(ProjectMember.project_id == project_id, ProjectMember.is_deleted.is_(False))
+            .order_by(ProjectMember.id)
+        ).all()
+        role_text = self._project_role_summary(project, project_members)
 
         # 周目标
         goal_row = self.db.execute(
@@ -109,12 +116,17 @@ class ReportService:
         if project.current_node_id:
             node = self.db.get(ProjectNode, project.current_node_id)
             if node:
-                current_node = {"id": node.id, "node_key": node.node_key, "name": node.name}
+                current_node = {
+                    "id": node.id, "node_key": node.node_key, "name": node.name,
+                    "planned_start": node.planned_start, "planned_end": node.planned_end,
+                    "overdue": bool(node.status != "passed" and node.planned_end and node.planned_end < date.today()),
+                }
 
         return {
             "project": {"id": project.id, "name": project.name, "code": project.code,
                         "machine_model": project.machine_model, "health": project.health,
-                        "status": project.status, "current_node": current_node},
+                        "status": project.status, "current_node": current_node,
+                        "project_roles": role_text},
             "week_start": ws, "week_end": we,
             "weekly_goal": goal_row.goal if goal_row else None,
             "tasks": week_tasks,

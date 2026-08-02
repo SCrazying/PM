@@ -22,7 +22,10 @@ router = APIRouter()
 
 
 def _node_out(n) -> dict:
-    return NodeOut.model_validate(n).model_dump()
+    from datetime import date
+    out = NodeOut.model_validate(n).model_dump()
+    out["overdue"] = bool(n.status != "passed" and n.planned_end and n.planned_end < date.today())
+    return out
 
 
 def _task_out(t) -> dict:

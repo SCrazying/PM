@@ -48,7 +48,8 @@ def get_project(project_id: int, user: dict = Depends(get_current_user), db: Ses
     out["nodes"] = [
         {"id": n.id, "node_key": n.node_key, "name": n.name, "sequence": n.sequence, "status": n.status,
          "planned_start": n.planned_start, "planned_end": n.planned_end,
-         "actual_start": n.actual_start, "actual_end": n.actual_end}
+         "actual_start": n.actual_start, "actual_end": n.actual_end,
+         "overdue": bool(n.status != "passed" and n.planned_end and n.planned_end < date.today())}
         for n in svc.list_nodes(project_id)
     ]
     return ok(out)
