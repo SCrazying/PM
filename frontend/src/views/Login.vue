@@ -59,7 +59,7 @@ async function onSubmit() {
   loading.value = true
   try {
     const data = await request.post('/auth/login', form)
-    store.setLogin(data.access_token, data.user)
+    store.setLogin(data.access_token, data.refresh_token, data.user)
     ElMessage.success('登录成功')
     router.push(route.query.redirect || '/')
   } catch (e) { /* 拦截器已提示 */ } finally {

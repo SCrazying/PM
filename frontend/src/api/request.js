@@ -8,6 +8,8 @@ const request = axios.create({
   timeout: 30000,
 })
 
+let refreshing = null // 防止并发刷新
+
 // 请求拦截：携带 token
 request.interceptors.request.use((config) => {
   const store = useUserStore()
@@ -17,7 +19,21 @@ request.interceptors.request.use((config) => {
   return config
 })
 
-// 响应拦截：统一处理 { code, message, data }
+async function doRefresh() {
+  const store = useUserStore()
+  if (!store.refreshToken) return null
+  try {
+    const resp = await axios.post('/api/v1/auth/refresh', { refresh_token: store.refreshToken })
+    const data = resp.data?.data
+    if (data?.access_token) {
+      store.setToken(data.access_token)
+      return data.access_token
+    }
+  } catch { /* refresh 失效 */ }
+  return null
+}
+
+// 响应拦截：统一处理 { code, message, data } + 401 自动续期
 request.interceptors.response.use(
   (response) => {
     const body = response.data
@@ -28,15 +44,27 @@ request.interceptors.response.use(
     }
     return body
   },
-  (error) => {
-    const status = error.response?.status
+  async (error) => {
+    const { config, response } = error
+    const status = response?.status
+    // 401 且未重试过：尝试用 refresh_token 续期后重放
+    if (status === 401 && config && !config._retried && !config.url.includes('/auth/')) {
+      config._retried = true
+      if (!refreshing) refreshing = doRefresh()
+      const newToken = await refreshing
+      refreshing = null
+      if (newToken) {
+        config.headers.Authorization = `Bearer ${newToken}`
+        return request(config) // 重放原请求
+      }
+    }
     if (status === 401) {
       const store = useUserStore()
       store.logout()
       router.push({ name: 'login' })
       ElMessage.error('登录已过期，请重新登录')
     } else {
-      ElMessage.error(error.response?.data?.message || error.message || '网络错误')
+      ElMessage.error(response?.data?.message || error.message || '网络错误')
     }
     return Promise.reject(error)
   }
