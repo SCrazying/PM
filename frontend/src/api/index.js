@@ -49,7 +49,7 @@ export const setWeeklyGoal = (projectId, data) => request.put(`/projects/${proje
 // 周报 / 看板
 export const projectWeekly = (projectId, week_start) => request.get(`/reports/projects/${projectId}/weekly`, { params: { week_start } })
 export const groupWeekly = (view, week_start) => request.get('/reports/group/weekly', { params: { view, week_start } })
-export const exportLedger = (week_start) => request.get('/reports/group/ledger/export', { params: { week_start }, responseType: 'blob' })
+export const exportLedger = (week_start, type = 'weekly') => request.get('/reports/group/ledger/export', { params: { week_start, type }, responseType: 'blob' })
 export const getBoard = (params) => request.get('/board', { params })
 
 // 通知

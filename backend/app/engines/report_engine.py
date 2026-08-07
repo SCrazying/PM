@@ -271,6 +271,69 @@ class ReportService:
         output.seek(0)
         return output
 
+    def export_completion_xlsx(self) -> BytesIO:
+        """项目完成台账：每项目一行，含各 TR 节点完成状态与项目完成度。"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "项目完成台账"
+        headers = ["机型", "项目", "负责人", "当前节点", "节点完成", "TR节点状态", "项目完成度"]
+        widths = [14, 26, 12, 18, 12, 46, 12]
+        header_fill = PatternFill("solid", fgColor="4F6EF7")
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        thin = Side(style="thin", color="D9E0EA")
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+        for col, (header, width) in enumerate(zip(headers, widths), start=1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.fill = header_fill; cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border = border
+            ws.column_dimensions[get_column_letter(col)].width = width
+        ws.row_dimensions[1].height = 28
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}1"
+
+        today = date.today()
+        projects = self.db.execute(
+            select(Project).where(Project.is_deleted.is_(False), Project.status != "archived").order_by(Project.name)
+        ).scalars().all()
+        row_no = 2
+        for p in projects:
+            owner = self.db.get(User, p.owner_id)
+            current = self.db.get(ProjectNode, p.current_node_id) if p.current_node_id else None
+            nodes = list(self.db.execute(
+                select(ProjectNode).where(
+                    ProjectNode.project_id == p.id, ProjectNode.parent_id.is_(None),
+                    ProjectNode.is_deleted.is_(False),
+                ).order_by(ProjectNode.sequence)
+            ).scalars().all())
+            passed = sum(1 for n in nodes if n.status == "passed")
+            total = len(nodes)
+            status_parts = []
+            for n in nodes:
+                mark = "✓" if n.status == "passed" else "→" if n.status == "in_progress" else "○"
+                if n.status != "passed" and n.planned_end and n.planned_end < today:
+                    mark = "⚠"
+                status_parts.append(f"{n.node_key}{mark}")
+            values = [
+                p.machine_model or "",
+                p.name,
+                owner.display_name if owner else "",
+                f"{current.node_key} {current.name}" if current else "",
+                f"{passed}/{total}",
+                " ".join(status_parts),
+                f"{round(passed / total * 100)}%" if total else "0%",
+            ]
+            for col, value in enumerate(values, start=1):
+                cell = ws.cell(row=row_no, column=col, value=value)
+                cell.alignment = Alignment(vertical="center", wrap_text=True)
+                cell.border = border
+            ws.row_dimensions[row_no].height = 24
+            row_no += 1
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output
+
     # ---------- 组内周报：按人 ----------
     def group_weekly_by_person(self, week_start: date) -> list[dict]:
         ws, we = self._week_range(week_start)

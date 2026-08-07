@@ -5,9 +5,17 @@
       <el-date-picker v-model="weekStart" type="week" format="YYYY 第 ww 周" value-format="YYYY-MM-DD"
                       style="width: 180px" @change="load" />
       <div style="flex:1"></div>
-      <el-button type="success" :loading="exporting" @click="downloadLedger">
-        <el-icon style="margin-right:5px"><Download /></el-icon>导出项目台账
-      </el-button>
+      <el-dropdown @command="downloadLedger">
+        <el-button type="success" :loading="exporting">
+          <el-icon style="margin-right:5px"><Download /></el-icon>导出台账<el-icon><ArrowDown /></el-icon>
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="weekly">导出本周台账</el-dropdown-item>
+            <el-dropdown-item command="completion">导出项目完成台账</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <el-radio-group v-model="view" @change="load">
         <el-radio-button value="project">按项目</el-radio-button>
         <el-radio-button value="person">按人</el-radio-button>
@@ -129,7 +137,9 @@
           </template>
         </el-table-column>
         <el-table-column label="周目标" min-width="180">
-          <template #default="{ row }">{{ row.weekly_goal || '（未设周目标）' }}</template>
+          <template #default="{ row }">
+            <div class="goal-cell">{{ row.weekly_goal || '（未设周目标）' }}</div>
+          </template>
         </el-table-column>
         <el-table-column label="任务概况" width="100" align="center">
           <template #default="{ row }">{{ doneTaskCount(row.tasks) }}/{{ row.tasks.length }}</template>
@@ -255,15 +265,15 @@ async function onToggleSub(s) {
   }
 }
 
-async function downloadLedger() {
+async function downloadLedger(type = 'weekly') {
   exporting.value = true
   try {
-    const response = await exportLedger(weekStart.value)
+    const response = await exportLedger(weekStart.value, type)
     const blob = new Blob([response], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `项目台账_${weekStart.value}.xlsx`
+    link.download = type === 'completion' ? '项目完成台账.xlsx' : `本周台账_${weekStart.value}.xlsx`
     link.click()
     URL.revokeObjectURL(url)
   } finally {
@@ -292,6 +302,7 @@ onMounted(load)
 .cn-row.current { background: var(--pm-primary-light); }
 .cn-row.done .cn-date { color: var(--pm-success); }
 .cn-date { color: var(--pm-text-3); white-space: nowrap; flex-shrink: 0; }
+.goal-cell { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; line-height: 1.5; }
 .sub-inline { cursor: pointer; }
 .sub-inline:hover { background: var(--pm-primary-light); }
 .sub-inline.done { background: #e9f9f0; }
