@@ -67,20 +67,20 @@ class NodeFlowService:
         return self._has_unfinished_rectify_tasks(node)
 
     def _can_enter_next(self, node: ProjectNode) -> tuple[bool, str]:
-        """流转门控（硬闭环）：本节点须 pass，或 conditional_pass 且整改全 done。"""
+        """流转门控（适配无评审环境）：本节点已通过(passed)即可进入下一节点。
+        评审为可选增强：若存在评审结论为 conditional_pass 且整改未关闭，仍拦截提示。
+        未评审也可推进（组内无正式评审流程时，负责人完成节点即放行）。"""
+        if node.status != "passed":
+            return False, "节点尚未完成"
         latest = self.db.execute(
             select(NodeReview).where(NodeReview.project_node_id == node.id)
             .order_by(NodeReview.review_date.desc(), NodeReview.id.desc())
         ).scalars().first()
-        if not latest:
-            return False, "尚未评审"
-        if latest.conclusion == "pass":
-            return True, ""
-        if latest.conclusion == "conditional_pass":
-            if self._has_unfinished_rectify_tasks(node):
-                return False, "存在未关闭的整改任务，不能进入下一节点"
-            return True, ""
-        return False, "评审未通过"
+        if latest and latest.conclusion == "conditional_pass" and self._has_unfinished_rectify_tasks(node):
+            return False, "存在未关闭的整改任务，不能进入下一节点"
+        if latest and latest.conclusion == "fail":
+            return False, "评审未通过"
+        return True, ""
 
     def transition(self, node_id: int, target: str, user: dict) -> ProjectNode:
         node = self._get(node_id)
@@ -205,7 +205,7 @@ class NodeFlowService:
 
     def complete_node(self, node_id: int, user: dict) -> ProjectNode:
         """负责人/管理员直接完成节点（置 passed + actual_end + 维护 current_node_id）。
-        灵活优先：不强制任务全完成。早会当场更新用。"""
+        灵活优先：不强制任务全完成；完成后若存在下一节点，自动将其置 in_progress（无评审环境一步推进）。"""
         node = self._get(node_id)
         project = self.db.get(Project, node.project_id)
         self._check_perm(project, user)
@@ -214,6 +214,17 @@ class NodeFlowService:
         node.status = "passed"
         if not node.actual_end:
             node.actual_end = date.today()
+        # 自动激活下一节点（若存在）
+        nxt = self.db.execute(
+            select(ProjectNode).where(
+                ProjectNode.project_id == node.project_id, ProjectNode.parent_id.is_(None),
+                ProjectNode.is_deleted.is_(False), ProjectNode.sequence > node.sequence,
+            ).order_by(ProjectNode.sequence)
+        ).scalars().first()
+        if nxt and nxt.status != "passed":
+            nxt.status = "in_progress"
+            if not nxt.actual_start:
+                nxt.actual_start = date.today()
         self._refresh_current_node(project)
         self.db.commit()
         self.db.refresh(node)
