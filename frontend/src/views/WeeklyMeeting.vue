@@ -86,11 +86,14 @@
             <span class="role-summary">{{ row.project.project_roles || '未分配' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="当前节点" min-width="160">
+        <el-table-column label="当前节点" min-width="190">
           <template #default="{ row }">
             <template v-if="row.project.current_node">
-              <el-tag size="small" effect="plain">{{ row.project.current_node.node_key }} {{ row.project.current_node.name }}</el-tag>
-              <el-tag v-if="row.project.current_node.overdue" size="small" type="warning" style="margin-left:4px">超期</el-tag>
+              <div class="cn-line">
+                <el-tag size="small" effect="plain">{{ row.project.current_node.node_key }}</el-tag>
+                <el-tag v-if="row.project.current_node.overdue" size="small" type="warning" style="margin-left:4px">超期</el-tag>
+              </div>
+              <div class="cn-name">{{ row.project.current_node.name }}</div>
               <div v-if="row.project.current_node.planned_end" class="pm-sub node-deadline">计划至 {{ row.project.current_node.planned_end }}</div>
             </template>
             <span v-else class="pm-sub">未设置</span>
@@ -279,27 +282,30 @@ onMounted(load)
 .report-body { padding: 6px 4px; }
 .rb-sec { margin-bottom: 8px; }
 .rb-h { font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--pm-text-2); }
-.daily-item { font-size: 13px; margin-bottom: 6px; }
-.risk { color: var(--pm-danger); font-size: 12px; }
+.daily-item { font-size: 13px; margin-bottom: 6px; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; line-height: 1.6; }
+.risk { color: var(--pm-danger); font-size: 12px; white-space: pre-wrap; word-break: break-word; }
 .empty { color: var(--pm-text-3); font-size: 13px; padding: 8px 0; }
 .pp-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .subnode-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .sub-inline-list { display: flex; flex-direction: column; gap: 2px; }
-.sub-inline { display: flex; align-items: center; gap: 5px; padding: 3px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
+.cn-line { display: flex; align-items: center; }
+.cn-name { font-size: 13px; line-height: 1.4; margin-top: 3px; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }
+.node-deadline { margin-top: 2px; }
+.sub-inline { display: flex; align-items: flex-start; gap: 5px; padding: 3px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
 .sub-inline:hover { background: var(--pm-primary-light); }
 .sub-inline.done { background: #e9f9f0; }
 .sub-inline.done .si-name { color: var(--pm-success); text-decoration: line-through; }
 .sub-inline.done .el-icon { color: var(--pm-success); }
-.sub-inline .el-icon { color: var(--pm-primary); }
-.si-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-inline .el-icon { color: var(--pm-primary); flex-shrink: 0; margin-top: 1px; }
+.si-name { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; line-height: 1.4; }
 .si-date { color: var(--pm-text-3); font-size: 11.5px; white-space: nowrap; }
 .si-overdue { color: var(--pm-danger); font-weight: 600; }
 
 .daily-inline { display: flex; flex-direction: column; gap: 4px; }
-.daily-inline-item { display: flex; align-items: center; gap: 5px; font-size: 12.5px; line-height: 1.4; }
-.di-date { color: var(--pm-text-3); font-size: 11px; white-space: nowrap; background: #eef1f6; padding: 0 5px; border-radius: 4px; }
-.di-author { color: var(--pm-primary); font-weight: 600; font-size: 12px; white-space: nowrap; }
-.di-work { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.daily-inline-item { display: flex; align-items: flex-start; gap: 5px; font-size: 12.5px; line-height: 1.5; }
+.di-date { color: var(--pm-text-3); font-size: 11px; white-space: nowrap; background: #eef1f6; padding: 0 5px; border-radius: 4px; flex-shrink: 0; }
+.di-author { color: var(--pm-primary); font-weight: 600; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+.di-work { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }
 
 .risk-item { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 8px; padding: 5px 8px; border-radius: 6px; cursor: pointer; background: #fef3f2; }
 .risk-item:hover { outline: 1px solid var(--pm-danger); }

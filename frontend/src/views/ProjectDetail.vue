@@ -517,10 +517,10 @@ onMounted(loadAll)
 .avatar-sm { width: 26px; height: 26px; border-radius: 50%; background: var(--pm-gradient); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
 .m-name { font-size: 14px; font-weight: 600; }
 .ptl { max-height: 320px; overflow-y: auto; }
-.pl-work { font-size: 13px; }
+.pl-work { font-size: 13px; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; line-height: 1.6; }
 .progress-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.progress-plan { margin-top: 4px; }
-.risk { color: var(--pm-danger); font-size: 12px; }
+.progress-plan { margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
+.risk { color: var(--pm-danger); font-size: 12px; white-space: pre-wrap; word-break: break-word; }
 .comp-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 12px; background: #f7f9fc; border-radius: 8px; }
 .comp-label { font-size: 12px; color: var(--pm-text-2); white-space: nowrap; }
 .comp-num { font-size: 12px; color: var(--pm-text-2); font-weight: 700; white-space: nowrap; }

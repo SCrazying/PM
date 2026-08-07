@@ -218,6 +218,6 @@ onMounted(load)
 .recent-progress:last-child { border-bottom: none; }
 .recent-head { display: flex; align-items: center; justify-content: space-between; }
 .recent-node { margin-top: 4px; }
-.recent-work { font-size: 13px; line-height: 1.5; margin-top: 4px; }
-.risk { color: var(--pm-danger); font-size: 12px; margin-top: 3px; }
+.recent-work { font-size: 13px; line-height: 1.6; margin-top: 4px; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }
+.risk { color: var(--pm-danger); font-size: 12px; margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
 </style>
