@@ -151,7 +151,7 @@ class ReportService:
         ws = wb.active
         ws.title = "项目台账"
         headers = ["机型", "项目", "是否投入", "项目角色", "关键节点", "周目标", "本周任务"]
-        widths = [14, 24, 12, 16, 18, 30, 52]
+        widths = [14, 24, 12, 22, 18, 30, 52]
         header_fill = PatternFill("solid", fgColor="4F6EF7")
         header_font = Font(bold=True, color="FFFFFF", size=11)
         thin = Side(style="thin", color="D9E0EA")

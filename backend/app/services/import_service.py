@@ -243,20 +243,27 @@ class ImportService:
             proj.name = p["name"]
             proj.machine_model = p.get("machine_model")
 
-        # 成员
+        # 成员（按 user_id 去重，避免 preview 重复项触发唯一约束；写入后 flush 保证后续 upsert 可见）
+        seen_users = set()
         for m in p["members"]:
-            if not m.get("user_id"):
+            m_uid = m.get("user_id")
+            if not m_uid or m_uid in seen_users:
                 continue
-            mem = self.db.execute(select(ProjectMember).where(
-                ProjectMember.project_id == proj.id, ProjectMember.user_id == m["user_id"])).scalar_one_or_none()
-            role = "负责人" if (m.get("is_owner") or m["user_id"] == owner_id) else (m.get("project_role") or "成员")
-            if mem:
-                mem.is_deleted = False
-                mem.project_role = role
-                mem.is_invested = m.get("is_invested", True)
+            seen_users.add(m_uid)
+            role = "负责人" if (m.get("is_owner") or m_uid == owner_id) else (m.get("project_role") or "成员")
+            member = self.db.execute(
+                select(ProjectMember).where(
+                    ProjectMember.project_id == proj.id, ProjectMember.user_id == m_uid)
+            ).scalar_one_or_none()
+            invested = m.get("is_invested", True)
+            if member:
+                member.is_deleted = False
+                member.project_role = role
+                member.is_invested = invested
             else:
-                self.db.add(ProjectMember(project_id=proj.id, user_id=m["user_id"], project_role=role,
-                                          is_invested=m.get("is_invested", True), joined_at=date.today()))
+                self.db.add(ProjectMember(project_id=proj.id, user_id=m_uid, project_role=role,
+                                          is_invested=invested, joined_at=date.today()))
+        self.db.flush()
         proj.owner_id = owner_id
 
         if p.get("role_assignments_detected"):
