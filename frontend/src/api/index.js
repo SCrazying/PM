@@ -41,6 +41,7 @@ export const listProgress = (projectId, params) => request.get(`/projects/${proj
 export const createProgress = (projectId, data) => request.post(`/projects/${projectId}/progress`, data)
 export const updateProgress = (id, data) => request.put(`/progress/${id}`, data)
 export const deleteProgress = (id) => request.delete(`/progress/${id}`)
+export const setProgressRiskResolved = (id, resolved) => request.patch(`/progress/${id}/risk-resolve`, { resolved })
 export const myTodo = () => request.get('/progress/mine/todo')
 export const getWeeklyGoal = (projectId, week_start) => request.get(`/projects/${projectId}/weekly-goal`, { params: { week_start } })
 export const setWeeklyGoal = (projectId, data) => request.put(`/projects/${projectId}/weekly-goal`, data)

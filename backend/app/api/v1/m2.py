@@ -51,6 +51,16 @@ def delete_progress(progress_id: int, user: dict = Depends(get_current_user), db
     return ok(message="已删除")
 
 
+@router.patch("/progress/{progress_id}/risk-resolve")
+def set_risk_resolved(progress_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    from app.models.project import Project
+    p = ProgressService(db).set_risk_resolved(progress_id, bool(body.get("resolved")), user)
+    # 关闭/打开风险后重算项目 health
+    BoardService(db).refresh_health(db.get(Project, p.project_id))
+    db.commit()
+    return ok({"id": p.id, "resolved": p.risk_resolved}, message="已关闭风险" if p.risk_resolved else "已重新打开")
+
+
 @router.get("/progress/mine/todo")
 def my_todo(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     return ok(ProgressService(db).my_todo(user))

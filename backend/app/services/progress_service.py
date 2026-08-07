@@ -130,6 +130,19 @@ class ProgressService:
         p.deleted_at = datetime.now(timezone.utc)
         self.db.commit()
 
+    def set_risk_resolved(self, progress_id: int, resolved: bool, user: dict) -> Progress:
+        """关闭/重新打开进展中的风险（本人或管理员）。"""
+        p = self.db.get(Progress, progress_id)
+        if not p or p.is_deleted:
+            raise NotFoundError("进展不存在")
+        if user["role"] != "admin" and p.author_id != user["user_id"]:
+            from app.core.responses import ForbiddenError
+            raise ForbiddenError("仅本人或管理员可操作")
+        p.risk_resolved = resolved
+        self.db.commit()
+        self.db.refresh(p)
+        return p
+
     def my_todo(self, user: dict) -> dict:
         """我的待办：我参与且投入的项目（今天是否已填报）+ 指派给我的未完成任务。"""
         from app.models.project import ProjectMember

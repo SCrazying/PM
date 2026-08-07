@@ -43,12 +43,13 @@ class BoardService:
         if delayed_node or delayed_task:
             return "delayed"
 
-        # at_risk：近期（N 天内）有风险进展
+        # at_risk：近期（N 天内）有未关闭的风险进展
         since = today - timedelta(days=self._risk_window_days())
         risk = self.db.execute(
             select(Progress).where(
                 Progress.project_id == project.id, Progress.is_deleted.is_(False),
                 Progress.risk.isnot(None), Progress.risk != "",
+                Progress.risk_resolved.is_(False),
                 Progress.progress_date >= since,
             )
         ).scalars().first()

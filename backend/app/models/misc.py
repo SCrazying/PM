@@ -22,6 +22,7 @@ class Progress(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     today_work: Mapped[str] = mapped_column(Text, nullable=False)
     tomorrow_plan: Mapped[str | None] = mapped_column(Text)
     risk: Mapped[str | None] = mapped_column(Text)
+    risk_resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
 
 class ProgressTaskLink(IdMixin, Base):

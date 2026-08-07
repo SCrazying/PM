@@ -106,10 +106,11 @@ class ReportService:
             d = p.progress_date.isoformat()
             daily.setdefault(d, []).append({
                 "author": uname, "today_work": p.today_work,
-                "tomorrow_plan": p.tomorrow_plan, "risk": p.risk,
+                "tomorrow_plan": p.tomorrow_plan, "risk": p.risk, "risk_resolved": p.risk_resolved,
             })
             if p.risk:
-                risks.append({"date": d, "author": uname, "risk": p.risk})
+                risks.append({"progress_id": p.id, "date": d, "author": uname, "risk": p.risk,
+                              "resolved": p.risk_resolved})
 
         # 当前节点 + 全部节点子节点（周会视图按节点分组展示全部子节点）
         current_node = None

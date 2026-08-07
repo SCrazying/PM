@@ -56,9 +56,15 @@
                   <div v-else class="empty">本周暂无进展记录</div>
                 </el-col>
                 <el-col :span="10">
-                  <div class="rb-h">风险问题</div>
+                  <div class="rb-h">风险问题（点击可关闭/重新打开）</div>
                   <div v-if="p.risks.length">
-                    <div v-for="(r, i) in p.risks" :key="i" class="risk-item">⚠ [{{ r.date }}] {{ r.author }}：{{ r.risk }}</div>
+                    <div v-for="(r, i) in p.risks" :key="i" class="risk-item" :class="{ resolved: r.resolved }"
+                         @click="onToggleRisk(r)">
+                      <el-icon :size="14" class="risk-ico"><CircleCheckFilled v-if="r.resolved" /><WarningFilled v-else /></el-icon>
+                      <span class="risk-txt">{{ r.risk }}</span>
+                      <span class="risk-meta">[{{ r.date }}] {{ r.author }}</span>
+                      <el-tag v-if="r.resolved" size="small" type="success" effect="plain">已解决</el-tag>
+                    </div>
                   </div>
                   <div v-else class="empty">无</div>
                 </el-col>
@@ -80,25 +86,43 @@
             <span class="role-summary">{{ row.project.project_roles || '未分配' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="当前节点" min-width="220">
+        <el-table-column label="当前节点" min-width="160">
           <template #default="{ row }">
             <template v-if="row.project.current_node">
               <el-tag size="small" effect="plain">{{ row.project.current_node.node_key }} {{ row.project.current_node.name }}</el-tag>
               <el-tag v-if="row.project.current_node.overdue" size="small" type="warning" style="margin-left:4px">超期</el-tag>
               <div v-if="row.project.current_node.planned_end" class="pm-sub node-deadline">计划至 {{ row.project.current_node.planned_end }}</div>
-              <!-- 当前节点子节点列表：主表直显，不展开 -->
-              <div v-if="row.subnodes && row.subnodes.length" class="sub-inline-list">
-                <div v-for="s in row.subnodes" :key="s.id" class="sub-inline" :class="{ done: s.status==='done' }"
-                     @click="onToggleSub(s)" :title="`${s.name}（点击切换完成）`">
-                  <el-icon :size="13"><Select v-if="s.status==='done'" /><CircleCheck v-else /></el-icon>
-                  <span class="si-name">{{ s.name }}</span>
-                  <span v-if="s.status==='done'" class="si-date">{{ s.actual_end }}</span>
-                  <span v-else-if="s.overdue" class="si-date si-overdue">延期</span>
-                  <span v-else-if="s.planned_end" class="si-date">{{ s.planned_end }}</span>
-                </div>
-              </div>
             </template>
             <span v-else class="pm-sub">未设置</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="子节点" min-width="200">
+          <template #default="{ row }">
+            <div v-if="row.subnodes && row.subnodes.length" class="sub-inline-list">
+              <div v-for="s in row.subnodes" :key="s.id" class="sub-inline" :class="{ done: s.status==='done' }"
+                   @click="onToggleSub(s)" :title="`${s.name}（点击切换完成）`">
+                <el-icon :size="13"><Select v-if="s.status==='done'" /><CircleCheck v-else /></el-icon>
+                <span class="si-name">{{ s.name }}</span>
+                <span v-if="s.status==='done'" class="si-date">{{ s.actual_end }}</span>
+                <span v-else-if="s.overdue" class="si-date si-overdue">延期</span>
+                <span v-else-if="s.planned_end" class="si-date">{{ s.planned_end }}</span>
+              </div>
+            </div>
+            <span v-else class="pm-sub">无</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="每日进展" min-width="220">
+          <template #default="{ row }">
+            <div v-if="dailyItems(row).length" class="daily-inline">
+              <div v-for="(it, i) in dailyItems(row)" :key="i" class="daily-inline-item">
+                <span class="di-date">{{ it.date }}</span>
+                <span class="di-author">{{ it.author }}</span>
+                <span class="di-work">{{ it.today_work }}</span>
+                <el-tag v-if="it.risk && !it.risk_resolved" size="small" type="warning" effect="plain">风险</el-tag>
+                <el-tag v-else-if="it.risk && it.risk_resolved" size="small" type="success" effect="plain">风险已解决</el-tag>
+              </div>
+            </div>
+            <span v-else class="pm-sub">无</span>
           </template>
         </el-table-column>
         <el-table-column label="周目标" min-width="180">
@@ -155,7 +179,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { groupWeekly, projectWeekly, listProjects, exportLedger, setSubnodeStatus } from '../api'
+import { groupWeekly, projectWeekly, listProjects, exportLedger, setSubnodeStatus, setProgressRiskResolved } from '../api'
 import { ElMessage } from 'element-plus'
 
 const today = new Date().toISOString().slice(0, 10)
@@ -172,6 +196,27 @@ const healthText = (h) => ({ on_track: '正常', at_risk: '风险', delayed: '�
 const taskTag = (t) => (t.status === 'done' ? 'success' : t.overdue ? 'danger' : t.status === 'in_progress' ? 'primary' : 'info')
 const taskText = (t) => (t.status === 'done' ? '已完成' : t.overdue ? '逾期' : t.status === 'in_progress' ? '进行中' : '未开始')
 const doneTaskCount = (tasks) => tasks.filter((t) => t.status === 'done').length
+
+// 每日进展列：把 p.daily 展平成有序列表（日期倒序，取最近 3 天）
+function dailyItems(row) {
+  const dates = Object.keys(row.daily || {}).sort().reverse()
+  const items = []
+  for (const d of dates) {
+    for (const it of row.daily[d] || []) {
+      items.push({ date: d.slice(5), author: it.author, today_work: it.today_work, risk: it.risk, risk_resolved: it.risk_resolved })
+    }
+  }
+  return items.slice(0, 4)
+}
+
+async function onToggleRisk(r) {
+  const target = !r.resolved
+  const updated = await setProgressRiskResolved(r.progress_id, target)
+  ElMessage.success(target ? '已关闭风险' : '已重新打开风险')
+  if (updated) {
+    r.resolved = updated.resolved
+  }
+}
 
 function onExpand(row, expandedRows) {
   const opened = expandedRows.some((item) => item.project.id === row.project.id)
@@ -233,19 +278,34 @@ onMounted(load)
 .rb-h { font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--pm-text-2); }
 .daily-item { font-size: 13px; margin-bottom: 6px; }
 .risk { color: var(--pm-danger); font-size: 12px; }
-.risk-item { color: var(--pm-danger); font-size: 13px; margin-bottom: 8px; }
 .empty { color: var(--pm-text-3); font-size: 13px; padding: 8px 0; }
 .pp-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .subnode-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-.sub-inline-list { margin-top: 6px; border-top: 1px dashed var(--pm-border); padding-top: 4px; }
-.sub-inline { display: flex; align-items: center; gap: 5px; padding: 3px 2px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
+.sub-inline-list { display: flex; flex-direction: column; gap: 2px; }
+.sub-inline { display: flex; align-items: center; gap: 5px; padding: 3px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
 .sub-inline:hover { background: var(--pm-primary-light); }
-.sub-inline.done .si-name { color: var(--pm-text-3); text-decoration: line-through; }
-.sub-inline .el-icon { color: var(--pm-text-3); }
-.sub-inline:not(.done) .el-icon { color: var(--pm-primary); }
+.sub-inline.done { background: #e9f9f0; }
+.sub-inline.done .si-name { color: var(--pm-success); text-decoration: line-through; }
+.sub-inline.done .el-icon { color: var(--pm-success); }
+.sub-inline .el-icon { color: var(--pm-primary); }
 .si-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .si-date { color: var(--pm-text-3); font-size: 11.5px; white-space: nowrap; }
 .si-overdue { color: var(--pm-danger); font-weight: 600; }
+
+.daily-inline { display: flex; flex-direction: column; gap: 4px; }
+.daily-inline-item { display: flex; align-items: center; gap: 5px; font-size: 12.5px; line-height: 1.4; }
+.di-date { color: var(--pm-text-3); font-size: 11px; white-space: nowrap; background: #eef1f6; padding: 0 5px; border-radius: 4px; }
+.di-author { color: var(--pm-primary); font-weight: 600; font-size: 12px; white-space: nowrap; }
+.di-work { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.risk-item { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 8px; padding: 5px 8px; border-radius: 6px; cursor: pointer; background: #fef3f2; }
+.risk-item:hover { outline: 1px solid var(--pm-danger); }
+.risk-item.resolved { background: #e9f9f0; }
+.risk-ico { color: var(--pm-danger); flex-shrink: 0; }
+.risk-item.resolved .risk-ico { color: var(--pm-success); }
+.risk-txt { flex: 1; min-width: 0; }
+.risk-item.resolved .risk-txt { color: var(--pm-text-3); text-decoration: line-through; }
+.risk-meta { color: var(--pm-text-3); font-size: 11.5px; white-space: nowrap; }
 .subnode-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: #f2f5fb; border: 1px solid var(--pm-border); border-radius: 20px; cursor: pointer; font-size: 13px; transition: all .15s; }
 .subnode-chip:hover { border-color: var(--pm-primary); background: var(--pm-primary-light); }
 .subnode-chip.done { background: #e9f9f0; border-color: #bfe8d4; }
