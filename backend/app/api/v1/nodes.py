@@ -51,11 +51,60 @@ def list_templates(user: dict = Depends(get_current_user), db: Session = Depends
     return ok(out)
 
 
+def _sub_out(s) -> dict:
+    from datetime import date
+    return {
+        "id": s.id, "parent_id": s.parent_id, "name": s.name, "status": s.status,
+        "planned_end": s.planned_end, "actual_end": s.actual_end,
+        "overdue": bool(s.status != "done" and s.planned_end and s.planned_end < date.today()),
+    }
+
+
 # ---------- 节点 ----------
 @router.get("/projects/{project_id}/nodes")
 def list_nodes(project_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    nodes = ProjectService(db).list_nodes(project_id)
-    return ok([_node_out(n) for n in nodes])
+    svc = ProjectService(db)
+    nodes = svc.list_nodes(project_id)
+    subs = svc.subnodes_map(project_id)
+    out = []
+    for n in nodes:
+        node_out = _node_out(n)
+        node_out["subnodes"] = [_sub_out(s) for s in subs.get(n.id, [])]
+        out.append(node_out)
+    return ok(out)
+
+
+# ---------- M6：子节点 ----------
+@router.post("/nodes/{node_id}/subnodes")
+def add_subnode(node_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    name = (body.get("name") or "").strip()
+    if not name:
+        from app.core.responses import BizException
+        raise BizException("子节点名称不能为空")
+    s = ProjectService(db).add_subnode(node_id, name, body.get("planned_end"), user)
+    record_audit(db, user["user_id"], "create", "node", str(s.id), {"parent_id": node_id, "name": name})
+    return ok(_sub_out(s), message="已添加子节点")
+
+
+@router.patch("/subnodes/{subnode_id}")
+def update_subnode(subnode_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    s = ProjectService(db).update_subnode(subnode_id, body.get("name"), body.get("planned_end"), user)
+    record_audit(db, user["user_id"], "update", "node", str(subnode_id), {"name": s.name, "planned_end": s.planned_end})
+    return ok(_sub_out(s), message="已更新")
+
+
+@router.patch("/subnodes/{subnode_id}/status")
+def set_subnode_status(subnode_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    s = ProjectService(db).set_subnode_status(subnode_id, body.get("status"), user)
+    record_audit(db, user["user_id"], "update", "node", str(subnode_id), {"status": s.status})
+    return ok(_sub_out(s), message="已更新")
+
+
+@router.delete("/subnodes/{subnode_id}")
+def delete_subnode(subnode_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    ProjectService(db).delete_subnode(subnode_id, user)
+    record_audit(db, user["user_id"], "delete", "node", str(subnode_id))
+    return ok(message="已删除")
 
 
 @router.patch("/nodes/{node_id}")

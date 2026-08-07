@@ -27,6 +27,19 @@
         <el-table-column type="expand" width="46">
           <template #default="{ row: p }">
             <div class="report-body">
+              <div v-if="p.subnodes && p.subnodes.length" class="rb-sec">
+                <div class="rb-h">当前节点子节点（点击勾选完成）</div>
+                <div class="subnode-grid">
+                  <span v-for="s in p.subnodes" :key="s.id" class="subnode-chip" :class="{ done: s.status==='done' }"
+                        @click="onToggleSub(s)">
+                    <el-icon><Select v-if="s.status==='done'" /><CircleCheck v-else /></el-icon>
+                    <span class="sn-txt">{{ s.name }}</span>
+                    <el-tag v-if="s.status==='done'" size="small" type="success">完成</el-tag>
+                    <el-tag v-else-if="s.overdue" size="small" type="danger">延期</el-tag>
+                    <el-tag v-else-if="s.planned_end" size="small" effect="plain">{{ s.planned_end }}</el-tag>
+                  </span>
+                </div>
+              </div>
               <div class="rb-sec">
                 <div class="rb-h">本周任务（{{ p.tasks.length }}）</div>
                 <el-table :data="p.tasks" size="small" border>
@@ -144,7 +157,8 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { groupWeekly, projectWeekly, listProjects, exportLedger } from '../api'
+import { groupWeekly, projectWeekly, listProjects, exportLedger, setSubnodeStatus } from '../api'
+import { ElMessage } from 'element-plus'
 
 const today = new Date().toISOString().slice(0, 10)
 const weekStart = ref(today)
@@ -183,6 +197,12 @@ async function load() {
   }
 }
 
+async function onToggleSub(s) {
+  await setSubnodeStatus(s.id, s.status === 'done' ? 'in_progress' : 'done')
+  ElMessage.success(s.status === 'done' ? '已取消完成' : '子节点已完成')
+  load()
+}
+
 async function downloadLedger() {
   exporting.value = true
   try {
@@ -215,4 +235,9 @@ onMounted(load)
 .risk-item { color: var(--pm-danger); font-size: 13px; margin-bottom: 8px; }
 .empty { color: var(--pm-text-3); font-size: 13px; padding: 8px 0; }
 .pp-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.subnode-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.subnode-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: #f2f5fb; border: 1px solid var(--pm-border); border-radius: 20px; cursor: pointer; font-size: 13px; transition: all .15s; }
+.subnode-chip:hover { border-color: var(--pm-primary); background: var(--pm-primary-light); }
+.subnode-chip.done { background: #e9f9f0; border-color: #bfe8d4; }
+.subnode-chip.done .sn-txt { color: var(--pm-text-3); text-decoration: line-through; }
 </style>

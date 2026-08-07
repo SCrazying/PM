@@ -57,6 +57,31 @@
             <span class="comp-num">{{ nodeComp.done }}/{{ nodeComp.total }}</span>
           </div>
 
+          <!-- M6 子节点 -->
+          <div v-if="currentNode" class="subnode-box">
+            <div class="pm-flex-between" style="margin-bottom:8px">
+              <span class="subnode-title">子节点
+                <el-tag v-if="subnodes.length && subnodes.filter(s=>s.status==='done').length===subnodes.length"
+                        size="small" type="success" style="margin-left:6px">子项全部完成</el-tag>
+              </span>
+              <el-button size="small" link type="primary" @click="openSubnode()" v-if="canEdit">+ 添加子节点</el-button>
+            </div>
+            <div v-if="!subnodes.length" class="empty subnode-empty">暂无子节点</div>
+            <div v-for="s in subnodes" :key="s.id" class="subnode-row" :class="{ done: s.status==='done' }">
+              <el-checkbox :model-value="s.status==='done'" @change="() => onToggleSubnode(s)">
+                <span class="sn-name">{{ s.name }}</span>
+              </el-checkbox>
+              <el-tag v-if="s.status==='done'" size="small" type="success">已完成 {{ s.actual_end }}</el-tag>
+              <el-tag v-else-if="s.overdue" size="small" type="danger">已延期</el-tag>
+              <el-tag v-else-if="s.planned_end" size="small" effect="plain">{{ s.planned_end }}</el-tag>
+              <el-tag v-else size="small" effect="plain">未设截止</el-tag>
+              <span class="sn-ops" v-if="canEdit">
+                <el-button link size="small" type="primary" @click="openSubnode(s)">编辑</el-button>
+                <el-button link size="small" type="danger" @click="onDelSubnode(s)">删除</el-button>
+              </span>
+            </div>
+          </div>
+
           <el-table :data="tasks" size="small" border>
             <el-table-column prop="title" label="任务" min-width="150" />
             <el-table-column label="指派人" width="80">
@@ -155,6 +180,20 @@
       </template>
     </el-dialog>
 
+    <!-- 子节点弹窗 -->
+    <el-dialog v-model="subnodeVisible" :title="subnodeForm.id ? '编辑子节点' : '添加子节点'" width="440px">
+      <el-form :model="subnodeForm" label-width="80px">
+        <el-form-item label="名称" required><el-input v-model="subnodeForm.name" placeholder="子节点名称" /></el-form-item>
+        <el-form-item label="截止时间">
+          <el-date-picker v-model="subnodeForm.planned_end" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="subnodeVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveSubnode">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 评审弹窗 -->
     <el-dialog v-model="reviewVisible" title="节点评审" width="440px">
       <el-form label-width="80px">
@@ -231,9 +270,10 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  addMember, addReview, createTask, deleteTask, getProject, getWeeklyGoal, listMembers, listProgress,
-  listReviews, listTasks, listUserOptions, nodeAdvance, nodeComplete, nodeCompletion, projectCompletion,
-  removeMember, setTaskStatus, setWeeklyGoal, updateProgress, updateTask,
+  addMember, addReview, addSubnode, createTask, deleteSubnode, deleteTask, getProject, getWeeklyGoal,
+  listMembers, listProgress, listReviews, listTasks, listUserOptions, nodeAdvance, nodeComplete,
+  nodeCompletion, projectCompletion, removeMember, setSubnodeStatus, setTaskStatus, setWeeklyGoal,
+  updateProgress, updateSubnode, updateTask,
 } from '../api'
 import { useUserStore } from '../store/user'
 import ProjectForm from '../components/ProjectForm.vue'
@@ -257,6 +297,9 @@ const progressForm = reactive({ id: null, progress_date: '', node_name: '', toda
 const weeklyGoal = ref('')
 const nodeComp = ref({ total: 0, done: 0, percent: 100 })
 const projComp = ref({ total: 0, passed: 0, percent: 0 })
+const subnodes = ref([])
+const subnodeVisible = ref(false)
+const subnodeForm = reactive({ id: null, name: '', planned_end: null })
 
 const statusMap = { not_started: '未开始', in_progress: '进行中', suspended: '暂停', completed: '已完成', archived: '已归档' }
 const taskVisible = ref(false)
@@ -314,6 +357,8 @@ async function loadTasks() {
   tasks.value = await listTasks(pid, { node_id: currentNode.value.id })
   reviews.value = await listReviews(currentNode.value.id).catch(() => [])
   nodeComp.value = await nodeCompletion(currentNode.value.id).catch(() => ({ total: 0, done: 0, percent: 100 }))
+  const cur = nodes.value.find((n) => n.id === currentNode.value.id)
+  subnodes.value = cur?.subnodes || []
 }
 async function loadProgress() { progressList.value = (await listProgress(pid, {})).slice(0, 20) }
 async function loadProjComp() { projComp.value = await projectCompletion(pid).catch(() => ({ total: 0, passed: 0, percent: 0 })) }
@@ -324,6 +369,35 @@ async function loadGoal() {
 }
 
 function selectNode(n) { currentNode.value = n; loadTasks() }
+
+// ---------- M6 子节点 ----------
+function openSubnode(s) {
+  if (s) Object.assign(subnodeForm, { id: s.id, name: s.name, planned_end: s.planned_end })
+  else Object.assign(subnodeForm, { id: null, name: '', planned_end: null })
+  subnodeVisible.value = true
+}
+
+async function saveSubnode() {
+  if (!subnodeForm.name.trim()) { ElMessage.warning('请输入子节点名称'); return }
+  if (subnodeForm.id) await updateSubnode(subnodeForm.id, subnodeForm)
+  else await addSubnode(currentNode.value.id, subnodeForm)
+  ElMessage.success('已保存')
+  subnodeVisible.value = false
+  loadAll()
+}
+
+async function onToggleSubnode(s) {
+  await setSubnodeStatus(s.id, s.status === 'done' ? 'in_progress' : 'done')
+  ElMessage.success(s.status === 'done' ? '已取消完成' : '子节点已完成')
+  loadAll()
+}
+
+async function onDelSubnode(s) {
+  await ElMessageBox.confirm(`删除子节点「${s.name}」？`, '提示', { type: 'warning' })
+  await deleteSubnode(s.id)
+  ElMessage.success('已删除')
+  loadAll()
+}
 
 function canEditProgress(progress) {
   return store.isAdmin || progress.author_id === store.userInfo?.id
@@ -450,6 +524,14 @@ onMounted(loadAll)
 .comp-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 12px; background: #f7f9fc; border-radius: 8px; }
 .comp-label { font-size: 12px; color: var(--pm-text-2); white-space: nowrap; }
 .comp-num { font-size: 12px; color: var(--pm-text-2); font-weight: 700; white-space: nowrap; }
+.subnode-box { margin-bottom: 12px; padding: 10px 14px; background: #fbfcff; border: 1px solid var(--pm-border); border-radius: 10px; }
+.subnode-title { font-weight: 700; font-size: 13px; display: flex; align-items: center; }
+.subnode-row { display: flex; align-items: center; gap: 10px; padding: 6px 2px; border-bottom: 1px dashed var(--pm-border); }
+.subnode-row:last-child { border-bottom: none; }
+.subnode-row.done .sn-name { color: var(--pm-text-3); text-decoration: line-through; }
+.sn-name { font-size: 14px; }
+.sn-ops { margin-left: auto; display: flex; gap: 4px; }
+.subnode-empty { padding: 4px 0; }
 .proj-comp { text-align: center; padding-right: 14px; margin-right: 4px; border-right: 1px solid var(--pm-border); }
 .proj-comp-num { font-size: 26px; font-weight: 800; color: var(--pm-primary); line-height: 1; }
 .pc-pct { font-size: 14px; }

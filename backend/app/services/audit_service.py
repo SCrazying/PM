@@ -1,9 +1,21 @@
 """审计服务：记录关键操作（变更字段 diff）。"""
+from datetime import date, datetime
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
 from app.models.misc import AuditLog
+
+
+def _jsonable(value: Any) -> Any:
+    """把 date/datetime 等转成可 JSON 序列化的值，避免 JSONB 写入失败。"""
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_jsonable(v) for v in value]
+    return value
 
 
 def record_audit(
@@ -21,7 +33,7 @@ def record_audit(
         action=action,
         target_type=target_type,
         target_id=target_id,
-        detail=detail,
+        detail=_jsonable(detail),
         ip=ip,
     )
     db.add(log)

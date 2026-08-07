@@ -111,8 +111,9 @@ class ReportService:
             if p.risk:
                 risks.append({"date": d, "author": uname, "risk": p.risk})
 
-        # 当前节点
+        # 当前节点 + 子节点
         current_node = None
+        subnodes = []
         if project.current_node_id:
             node = self.db.get(ProjectNode, project.current_node_id)
             if node:
@@ -121,6 +122,17 @@ class ReportService:
                     "planned_start": node.planned_start, "planned_end": node.planned_end,
                     "overdue": bool(node.status != "passed" and node.planned_end and node.planned_end < date.today()),
                 }
+                subs = self.db.execute(
+                    select(ProjectNode).where(
+                        ProjectNode.parent_id == node.id, ProjectNode.is_deleted.is_(False),
+                    ).order_by(ProjectNode.sequence)
+                ).scalars().all()
+                subnodes = [
+                    {"id": s.id, "name": s.name, "status": s.status, "planned_end": s.planned_end,
+                     "actual_end": s.actual_end,
+                     "overdue": bool(s.status != "done" and s.planned_end and s.planned_end < date.today())}
+                    for s in subs
+                ]
 
         return {
             "project": {"id": project.id, "name": project.name, "code": project.code,
@@ -132,6 +144,7 @@ class ReportService:
             "tasks": week_tasks,
             "daily": daily,
             "risks": risks,
+            "subnodes": subnodes,
         }
 
     # ---------- 组内周报：按项目 ----------

@@ -73,6 +73,7 @@ class ProjectNode(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     project_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("project.id", ondelete="RESTRICT"), nullable=False)
     template_node_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("tr_template_node.id", ondelete="SET NULL"))
+    parent_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("project_node.id", ondelete="CASCADE"))
     node_key: Mapped[str] = mapped_column(String(16), nullable=False)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)

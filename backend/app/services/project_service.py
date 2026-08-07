@@ -383,10 +383,98 @@ class ProjectService:
 
     # ---------- 节点 ----------
     def list_nodes(self, project_id: int) -> List[ProjectNode]:
+        """顶层 TR 节点列表（不含子节点）。"""
         self.get_project(project_id)
         return list(self.db.execute(
-            select(ProjectNode).where(ProjectNode.project_id == project_id, ProjectNode.is_deleted.is_(False)).order_by(ProjectNode.sequence)
+            select(ProjectNode).where(
+                ProjectNode.project_id == project_id,
+                ProjectNode.parent_id.is_(None),
+                ProjectNode.is_deleted.is_(False),
+            ).order_by(ProjectNode.sequence)
         ).scalars().all())
+
+    def list_subnodes(self, node_id: int) -> List[ProjectNode]:
+        """某节点下的子节点列表。"""
+        return list(self.db.execute(
+            select(ProjectNode).where(
+                ProjectNode.parent_id == node_id, ProjectNode.is_deleted.is_(False),
+            ).order_by(ProjectNode.sequence)
+        ).scalars().all())
+
+    def subnodes_map(self, project_id: int) -> dict[int, List[ProjectNode]]:
+        """项目全部顶层节点 → 子节点映射（供详情/周报返回）。"""
+        top_ids = [n.id for n in self.list_nodes(project_id)]
+        if not top_ids:
+            return {}
+        rows = self.db.execute(
+            select(ProjectNode).where(
+                ProjectNode.parent_id.in_(top_ids), ProjectNode.is_deleted.is_(False),
+            ).order_by(ProjectNode.sequence)
+        ).scalars().all()
+        result: dict[int, List[ProjectNode]] = {tid: [] for tid in top_ids}
+        for sub in rows:
+            result.setdefault(sub.parent_id, []).append(sub)
+        return result
+
+    def add_subnode(self, parent_node_id: int, name: str, planned_end, user: dict) -> ProjectNode:
+        """在节点下添加子节点（owner/admin）。"""
+        parent = self.db.get(ProjectNode, parent_node_id)
+        if not parent or parent.is_deleted or parent.parent_id is not None:
+            raise BizException("父节点不存在或不是顶层节点")
+        project = self.get_project(parent.project_id)
+        self.check_owner(project, user)
+        seq = self.db.execute(
+            select(func.count()).select_from(ProjectNode).where(
+                ProjectNode.parent_id == parent.id, ProjectNode.is_deleted.is_(False))
+        ).scalar_one() + 1
+        sub = ProjectNode(
+            project_id=parent.project_id, parent_id=parent.id,
+            node_key="SUB", name=name, sequence=seq, status="not_started",
+            planned_end=planned_end,
+        )
+        self.db.add(sub)
+        self.db.commit()
+        self.db.refresh(sub)
+        return sub
+
+    def update_subnode(self, subnode_id: int, name, planned_end, user: dict) -> ProjectNode:
+        sub = self.db.get(ProjectNode, subnode_id)
+        if not sub or sub.is_deleted or sub.parent_id is None:
+            raise NotFoundError("子节点不存在")
+        project = self.get_project(sub.project_id)
+        self.check_owner(project, user)
+        if name:
+            sub.name = name
+        sub.planned_end = planned_end
+        self.db.commit()
+        self.db.refresh(sub)
+        return sub
+
+    def set_subnode_status(self, subnode_id: int, status: str, user: dict) -> ProjectNode:
+        """更新子节点完成状态（member 可操作）。"""
+        sub = self.db.get(ProjectNode, subnode_id)
+        if not sub or sub.is_deleted or sub.parent_id is None:
+            raise NotFoundError("子节点不存在")
+        project = self.get_project(sub.project_id)
+        self.check_member(project, user)
+        if status not in ("done", "in_progress", "not_started"):
+            raise BizException("子节点状态不合法")
+        sub.status = status
+        sub.actual_end = date.today() if status == "done" else None
+        self.db.commit()
+        self.db.refresh(sub)
+        return sub
+
+    def delete_subnode(self, subnode_id: int, user: dict) -> None:
+        sub = self.db.get(ProjectNode, subnode_id)
+        if not sub or sub.is_deleted or sub.parent_id is None:
+            raise NotFoundError("子节点不存在")
+        project = self.get_project(sub.project_id)
+        self.check_owner(project, user)
+        sub.is_deleted = True
+        from datetime import datetime, timezone
+        sub.deleted_at = datetime.now(timezone.utc)
+        self.db.commit()
 
     def update_node(self, node_id: int, body, user: dict) -> ProjectNode:
         node = self.db.get(ProjectNode, node_id)
@@ -406,7 +494,11 @@ class ProjectService:
 
     def _refresh_current_node(self, project: Project) -> None:
         nodes = list(self.db.execute(
-            select(ProjectNode).where(ProjectNode.project_id == project.id, ProjectNode.is_deleted.is_(False)).order_by(ProjectNode.sequence)
+            select(ProjectNode).where(
+                ProjectNode.project_id == project.id,
+                ProjectNode.parent_id.is_(None),
+                ProjectNode.is_deleted.is_(False),
+            ).order_by(ProjectNode.sequence)
         ).scalars().all())
         current = None
         for n in nodes:

@@ -52,11 +52,16 @@ class UnauthorizedError(BizException):
 
 
 def register_exception_handlers(app) -> None:
+    import logging
+
+    logger = logging.getLogger("pm.api")
+
     @app.exception_handler(BizException)
     async def _biz_handler(request: Request, exc: BizException):
         return JSONResponse(status_code=exc.http_status, content=error(exc.code, exc.message, exc.data))
 
     @app.exception_handler(Exception)
     async def _unhandled_handler(request: Request, exc: Exception):
-        # 兜底，避免泄露内部细节
+        # 兜底，避免泄露内部细节；记录完整 traceback 便于排查
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
         return JSONResponse(status_code=500, content=error(CODE_SERVER_ERROR, "服务器内部错误"))

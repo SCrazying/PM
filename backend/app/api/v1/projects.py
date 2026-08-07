@@ -45,11 +45,18 @@ def get_project(project_id: int, user: dict = Depends(get_current_user), db: Ses
     out = ProjectOut.model_validate(p).model_dump()
     out["members"] = svc.list_members(project_id)
     out["role_assignments"] = svc.list_role_assignments(project_id)
+    subs = svc.subnodes_map(project_id)
     out["nodes"] = [
         {"id": n.id, "node_key": n.node_key, "name": n.name, "sequence": n.sequence, "status": n.status,
          "planned_start": n.planned_start, "planned_end": n.planned_end,
          "actual_start": n.actual_start, "actual_end": n.actual_end,
-         "overdue": bool(n.status != "passed" and n.planned_end and n.planned_end < date.today())}
+         "overdue": bool(n.status != "passed" and n.planned_end and n.planned_end < date.today()),
+         "subnodes": [
+             {"id": s.id, "name": s.name, "status": s.status, "planned_end": s.planned_end,
+              "actual_end": s.actual_end,
+              "overdue": bool(s.status != "done" and s.planned_end and s.planned_end < date.today())}
+             for s in subs.get(n.id, [])
+         ]}
         for n in svc.list_nodes(project_id)
     ]
     return ok(out)
