@@ -74,7 +74,7 @@ npm run dev                     # http://localhost:5173（已配置 /api 代理�
 ## 部署（生产，两种方式）
 详见 [doc/部署手册.md](doc/部署手册.md)。
 - **Docker**：`docker compose up -d`
-- **离线/原生**（内网无 Docker）：`bash deploy/scripts/prepare_offline.sh` 备料 → 拷贝到内网 → `sudo bash deploy/scripts/install.sh`
+- **离线/原生**（内网无 Docker，Windows 数据库初始化）：`powershell -ExecutionPolicy Bypass -File deploy/scripts/init_db.ps1`（幂等建用户/库 → 迁移建表 → 写入种子数据）
 
 ## 当前进度
 - [x] M0 工程基座（骨架 + 部署脚本）

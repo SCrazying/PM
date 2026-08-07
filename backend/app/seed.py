@@ -37,11 +37,29 @@ def _run_via_sqlalchemy() -> int:
 
     with open(SEED_FILE, encoding="utf-8") as f:
         sql = f.read()
-    # 去掉事务控制（engine 自动提交），按语句拆分执行
-    stmts = [s.strip() for s in sql.replace("BEGIN;", "").replace("COMMIT;", "").split(";") if s.strip()]
+    # 去掉事务控制（engine 自动提交），按语句拆分执行；整行注释跳过，忽略注释内的分号
+    stmts, current = [], []
+    for raw_line in sql.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("--"):
+            continue
+        if line.strip().upper() in ("BEGIN", "COMMIT"):
+            continue
+        current.append(raw_line)
+        # 语句结束判定：去掉行内注释后以 ; 结尾
+        code = line.split("--")[0].rstrip()
+        if code.endswith(";"):
+            stmts.append("\n".join(current))
+            current = []
+    if current:
+        stmts.append("\n".join(current))
     try:
         with engine.begin() as conn:
             for s in stmts:
+                if not s.strip():
+                    continue
                 conn.execute(text(s))
         logger.info("种子数据执行完成（SQLAlchemy）")
         return 0
