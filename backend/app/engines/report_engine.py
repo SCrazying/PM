@@ -111,7 +111,7 @@ class ReportService:
             if p.risk:
                 risks.append({"date": d, "author": uname, "risk": p.risk})
 
-        # 当前节点 + 子节点
+        # 当前节点 + 全部节点子节点（周会视图按节点分组展示全部子节点）
         current_node = None
         subnodes = []
         if project.current_node_id:
@@ -122,17 +122,39 @@ class ReportService:
                     "planned_start": node.planned_start, "planned_end": node.planned_end,
                     "overdue": bool(node.status != "passed" and node.planned_end and node.planned_end < date.today()),
                 }
-                subs = self.db.execute(
-                    select(ProjectNode).where(
-                        ProjectNode.parent_id == node.id, ProjectNode.is_deleted.is_(False),
-                    ).order_by(ProjectNode.sequence)
-                ).scalars().all()
-                subnodes = [
-                    {"id": s.id, "name": s.name, "status": s.status, "planned_end": s.planned_end,
-                     "actual_end": s.actual_end,
-                     "overdue": bool(s.status != "done" and s.planned_end and s.planned_end < date.today())}
-                    for s in subs
-                ]
+        # 全部顶层节点及其子节点（仅含有子节点的节点）
+        node_subnodes = []
+        top_nodes = self.db.execute(
+            select(ProjectNode).where(
+                ProjectNode.project_id == project_id, ProjectNode.parent_id.is_(None),
+                ProjectNode.is_deleted.is_(False),
+            ).order_by(ProjectNode.sequence)
+        ).scalars().all()
+        top_ids = [n.id for n in top_nodes]
+        if top_ids:
+            sub_rows = self.db.execute(
+                select(ProjectNode).where(
+                    ProjectNode.parent_id.in_(top_ids), ProjectNode.is_deleted.is_(False),
+                ).order_by(ProjectNode.sequence)
+            ).scalars().all()
+            subs_by_parent: dict[int, list] = {}
+            for s in sub_rows:
+                subs_by_parent.setdefault(s.parent_id, []).append(s)
+            for n in top_nodes:
+                subs = subs_by_parent.get(n.id)
+                if not subs:
+                    continue
+                node_subnodes.append({
+                    "node_id": n.id, "node_key": n.node_key, "name": n.name,
+                    "subnodes": [
+                        {"id": s.id, "name": s.name, "status": s.status, "planned_end": s.planned_end,
+                         "actual_end": s.actual_end,
+                         "overdue": bool(s.status != "done" and s.planned_end and s.planned_end < date.today())}
+                        for s in subs
+                    ],
+                })
+                if n.id == project.current_node_id:
+                    subnodes = node_subnodes[-1]["subnodes"]
 
         return {
             "project": {"id": project.id, "name": project.name, "code": project.code,
@@ -145,6 +167,7 @@ class ReportService:
             "daily": daily,
             "risks": risks,
             "subnodes": subnodes,
+            "node_subnodes": node_subnodes,
         }
 
     # ---------- 组内周报：按项目 ----------

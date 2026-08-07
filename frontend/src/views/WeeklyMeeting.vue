@@ -27,17 +27,24 @@
         <el-table-column type="expand" width="46">
           <template #default="{ row: p }">
             <div class="report-body">
-              <div v-if="p.subnodes && p.subnodes.length" class="rb-sec">
-                <div class="rb-h">当前节点子节点（点击勾选完成）</div>
-                <div class="subnode-grid">
-                  <span v-for="s in p.subnodes" :key="s.id" class="subnode-chip" :class="{ done: s.status==='done' }"
-                        @click="onToggleSub(s)">
-                    <el-icon><Select v-if="s.status==='done'" /><CircleCheck v-else /></el-icon>
-                    <span class="sn-txt">{{ s.name }}</span>
-                    <el-tag v-if="s.status==='done'" size="small" type="success">完成</el-tag>
-                    <el-tag v-else-if="s.overdue" size="small" type="danger">延期</el-tag>
-                    <el-tag v-else-if="s.planned_end" size="small" effect="plain">{{ s.planned_end }}</el-tag>
-                  </span>
+              <div v-if="p.node_subnodes && p.node_subnodes.length" class="rb-sec">
+                <div class="rb-h">子节点（点击勾选完成）</div>
+                <div v-for="g in p.node_subnodes" :key="g.node_id" class="node-subnode-group">
+                  <div class="nsg-head">
+                    <el-tag size="small" effect="plain">{{ g.node_key }}</el-tag>
+                    <span class="nsg-name">{{ g.name }}</span>
+                    <span class="nsg-count">{{ g.subnodes.filter(s=>s.status==='done').length }}/{{ g.subnodes.length }} 完成</span>
+                  </div>
+                  <div class="subnode-grid">
+                    <span v-for="s in g.subnodes" :key="s.id" class="subnode-chip" :class="{ done: s.status==='done' }"
+                          @click="onToggleSub(g, s)">
+                      <el-icon><Select v-if="s.status==='done'" /><CircleCheck v-else /></el-icon>
+                      <span class="sn-txt">{{ s.name }}</span>
+                      <el-tag v-if="s.status==='done'" size="small" type="success">{{ s.actual_end }}</el-tag>
+                      <el-tag v-else-if="s.overdue" size="small" type="danger">延期 {{ s.planned_end }}</el-tag>
+                      <el-tag v-else-if="s.planned_end" size="small" effect="plain">截止 {{ s.planned_end }}</el-tag>
+                    </span>
+                  </div>
                 </div>
               </div>
               <div class="rb-sec">
@@ -197,10 +204,14 @@ async function load() {
   }
 }
 
-async function onToggleSub(s) {
-  await setSubnodeStatus(s.id, s.status === 'done' ? 'in_progress' : 'done')
-  ElMessage.success(s.status === 'done' ? '已取消完成' : '子节点已完成')
-  load()
+async function onToggleSub(group, s) {
+  const target = s.status === 'done' ? 'in_progress' : 'done'
+  const updated = await setSubnodeStatus(s.id, target)
+  ElMessage.success(target === 'done' ? `子节点「${s.name}」已完成` : `已取消「${s.name}」完成`)
+  // 局部同步更新，不整页重载
+  if (group && updated) {
+    Object.assign(s, { status: updated.status, actual_end: updated.actual_end, overdue: updated.overdue })
+  }
 }
 
 async function downloadLedger() {
@@ -236,6 +247,10 @@ onMounted(load)
 .empty { color: var(--pm-text-3); font-size: 13px; padding: 8px 0; }
 .pp-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .subnode-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.node-subnode-group { margin-bottom: 10px; padding: 8px 10px; background: #f7f9fc; border-radius: 8px; }
+.nsg-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.nsg-name { font-weight: 600; font-size: 13px; }
+.nsg-count { margin-left: auto; font-size: 12px; color: var(--pm-text-3); white-space: nowrap; }
 .subnode-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: #f2f5fb; border: 1px solid var(--pm-border); border-radius: 20px; cursor: pointer; font-size: 13px; transition: all .15s; }
 .subnode-chip:hover { border-color: var(--pm-primary); background: var(--pm-primary-light); }
 .subnode-chip.done { background: #e9f9f0; border-color: #bfe8d4; }
