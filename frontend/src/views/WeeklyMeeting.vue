@@ -27,26 +27,6 @@
         <el-table-column type="expand" width="46">
           <template #default="{ row: p }">
             <div class="report-body">
-              <div v-if="p.node_subnodes && p.node_subnodes.length" class="rb-sec">
-                <div class="rb-h">子节点（点击勾选完成）</div>
-                <div v-for="g in p.node_subnodes" :key="g.node_id" class="node-subnode-group">
-                  <div class="nsg-head">
-                    <el-tag size="small" effect="plain">{{ g.node_key }}</el-tag>
-                    <span class="nsg-name">{{ g.name }}</span>
-                    <span class="nsg-count">{{ g.subnodes.filter(s=>s.status==='done').length }}/{{ g.subnodes.length }} 完成</span>
-                  </div>
-                  <div class="subnode-grid">
-                    <span v-for="s in g.subnodes" :key="s.id" class="subnode-chip" :class="{ done: s.status==='done' }"
-                          @click="onToggleSub(g, s)">
-                      <el-icon><Select v-if="s.status==='done'" /><CircleCheck v-else /></el-icon>
-                      <span class="sn-txt">{{ s.name }}</span>
-                      <el-tag v-if="s.status==='done'" size="small" type="success">{{ s.actual_end }}</el-tag>
-                      <el-tag v-else-if="s.overdue" size="small" type="danger">延期 {{ s.planned_end }}</el-tag>
-                      <el-tag v-else-if="s.planned_end" size="small" effect="plain">截止 {{ s.planned_end }}</el-tag>
-                    </span>
-                  </div>
-                </div>
-              </div>
               <div class="rb-sec">
                 <div class="rb-h">本周任务（{{ p.tasks.length }}）</div>
                 <el-table :data="p.tasks" size="small" border>
@@ -100,12 +80,23 @@
             <span class="role-summary">{{ row.project.project_roles || '未分配' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="当前节点" min-width="170">
+        <el-table-column label="当前节点" min-width="220">
           <template #default="{ row }">
             <template v-if="row.project.current_node">
               <el-tag size="small" effect="plain">{{ row.project.current_node.node_key }} {{ row.project.current_node.name }}</el-tag>
               <el-tag v-if="row.project.current_node.overdue" size="small" type="warning" style="margin-left:4px">超期</el-tag>
               <div v-if="row.project.current_node.planned_end" class="pm-sub node-deadline">计划至 {{ row.project.current_node.planned_end }}</div>
+              <!-- 当前节点子节点列表：主表直显，不展开 -->
+              <div v-if="row.subnodes && row.subnodes.length" class="sub-inline-list">
+                <div v-for="s in row.subnodes" :key="s.id" class="sub-inline" :class="{ done: s.status==='done' }"
+                     @click="onToggleSub(s)" :title="`${s.name}（点击切换完成）`">
+                  <el-icon :size="13"><Select v-if="s.status==='done'" /><CircleCheck v-else /></el-icon>
+                  <span class="si-name">{{ s.name }}</span>
+                  <span v-if="s.status==='done'" class="si-date">{{ s.actual_end }}</span>
+                  <span v-else-if="s.overdue" class="si-date si-overdue">延期</span>
+                  <span v-else-if="s.planned_end" class="si-date">{{ s.planned_end }}</span>
+                </div>
+              </div>
             </template>
             <span v-else class="pm-sub">未设置</span>
           </template>
@@ -204,12 +195,11 @@ async function load() {
   }
 }
 
-async function onToggleSub(group, s) {
+async function onToggleSub(s) {
   const target = s.status === 'done' ? 'in_progress' : 'done'
   const updated = await setSubnodeStatus(s.id, target)
   ElMessage.success(target === 'done' ? `子节点「${s.name}」已完成` : `已取消「${s.name}」完成`)
-  // 局部同步更新，不整页重载
-  if (group && updated) {
+  if (updated) {
     Object.assign(s, { status: updated.status, actual_end: updated.actual_end, overdue: updated.overdue })
   }
 }
@@ -247,10 +237,15 @@ onMounted(load)
 .empty { color: var(--pm-text-3); font-size: 13px; padding: 8px 0; }
 .pp-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .subnode-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-.node-subnode-group { margin-bottom: 10px; padding: 8px 10px; background: #f7f9fc; border-radius: 8px; }
-.nsg-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.nsg-name { font-weight: 600; font-size: 13px; }
-.nsg-count { margin-left: auto; font-size: 12px; color: var(--pm-text-3); white-space: nowrap; }
+.sub-inline-list { margin-top: 6px; border-top: 1px dashed var(--pm-border); padding-top: 4px; }
+.sub-inline { display: flex; align-items: center; gap: 5px; padding: 3px 2px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
+.sub-inline:hover { background: var(--pm-primary-light); }
+.sub-inline.done .si-name { color: var(--pm-text-3); text-decoration: line-through; }
+.sub-inline .el-icon { color: var(--pm-text-3); }
+.sub-inline:not(.done) .el-icon { color: var(--pm-primary); }
+.si-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.si-date { color: var(--pm-text-3); font-size: 11.5px; white-space: nowrap; }
+.si-overdue { color: var(--pm-danger); font-weight: 600; }
 .subnode-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: #f2f5fb; border: 1px solid var(--pm-border); border-radius: 20px; cursor: pointer; font-size: 13px; transition: all .15s; }
 .subnode-chip:hover { border-color: var(--pm-primary); background: var(--pm-primary-light); }
 .subnode-chip.done { background: #e9f9f0; border-color: #bfe8d4; }
