@@ -19,13 +19,14 @@ from app.models.project import (
     Task,
     TrTemplate,
     TrTemplateNode,
+    TrTemplateSubnode,
 )
 from app.models.user import AuthToken, PasswordReset, User
 
 __all__ = [
     "Base",
     "User", "AuthToken", "PasswordReset",
-    "Project", "ProjectMember", "ProjectRoleAssignment", "TrTemplate", "TrTemplateNode", "ProjectNode", "NodeReview", "Task",
+    "Project", "ProjectMember", "ProjectRoleAssignment", "TrTemplate", "TrTemplateNode", "TrTemplateSubnode", "ProjectNode", "NodeReview", "Task",
     "Progress", "ProgressTaskLink", "ProjectWeeklyGoal", "Attachment",
     "AiSummary", "AuditLog", "Config", "Notification",
 ]

@@ -134,12 +134,19 @@ def set_config(key: str, body: dict, user: dict = Depends(require_admin), db: Se
 # ---------- TR 模板管理 ----------
 @router.post("/tr-templates")
 def create_template(body: dict, user: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    from app.models.project import TrTemplateSubnode
     tpl = TrTemplate(name=body["name"], description=body.get("description"), is_builtin=False)
     db.add(tpl)
     db.flush()
     for i, n in enumerate(body.get("nodes", []), start=1):
-        db.add(TrTemplateNode(template_id=tpl.id, node_key=n["node_key"], name=n["name"],
-                              sequence=n.get("sequence", i), review_focus=n.get("review_focus")))
+        node = TrTemplateNode(template_id=tpl.id, node_key=n["node_key"], name=n["name"],
+                              sequence=n.get("sequence", i), review_focus=n.get("review_focus"))
+        db.add(node)
+        db.flush()
+        for j, sn in enumerate(n.get("subnodes", []), start=1):
+            sn_name = (sn.get("name") if isinstance(sn, dict) else sn) or ""
+            if sn_name.strip():
+                db.add(TrTemplateSubnode(template_node_id=node.id, name=str(sn_name).strip(), sequence=j))
     db.commit()
     return ok({"id": tpl.id}, message="模板已创建")
 

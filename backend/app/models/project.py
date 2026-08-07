@@ -68,6 +68,15 @@ class TrTemplateNode(IdMixin, Base):
     review_focus: Mapped[str | None] = mapped_column(Text)
 
 
+class TrTemplateSubnode(IdMixin, Base):
+    """模板节点的默认子节点定义，建项目时实例化为 project_node 子节点。"""
+    __tablename__ = "tr_template_subnode"
+
+    template_node_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tr_template_node.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class ProjectNode(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "project_node"
 

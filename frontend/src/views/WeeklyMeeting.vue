@@ -102,10 +102,10 @@
               <div v-for="s in row.subnodes" :key="s.id" class="sub-inline" :class="{ done: s.status==='done' }"
                    @click="onToggleSub(s)" :title="`${s.name}（点击切换完成）`">
                 <el-icon :size="13"><Select v-if="s.status==='done'" /><CircleCheck v-else /></el-icon>
+                <span v-if="s.status==='done'" class="si-date">{{ shortDate(s.actual_end) }}</span>
+                <span v-else-if="s.overdue" class="si-date si-overdue">{{ shortDate(s.planned_end) }} 延期</span>
+                <span v-else-if="s.planned_end" class="si-date">{{ shortDate(s.planned_end) }}</span>
                 <span class="si-name">{{ s.name }}</span>
-                <span v-if="s.status==='done'" class="si-date">{{ s.actual_end }}</span>
-                <span v-else-if="s.overdue" class="si-date si-overdue">延期</span>
-                <span v-else-if="s.planned_end" class="si-date">{{ s.planned_end }}</span>
               </div>
             </div>
             <span v-else class="pm-sub">无</span>
@@ -196,6 +196,9 @@ const healthText = (h) => ({ on_track: '正常', at_risk: '风险', delayed: '�
 const taskTag = (t) => (t.status === 'done' ? 'success' : t.overdue ? 'danger' : t.status === 'in_progress' ? 'primary' : 'info')
 const taskText = (t) => (t.status === 'done' ? '已完成' : t.overdue ? '逾期' : t.status === 'in_progress' ? '进行中' : '未开始')
 const doneTaskCount = (tasks) => tasks.filter((t) => t.status === 'done').length
+
+// 短日期 MM-DD
+const shortDate = (d) => (d ? String(d).slice(5) : '')
 
 // 每日进展列：把 p.daily 展平成有序列表（日期倒序，取最近 3 天）
 function dailyItems(row) {

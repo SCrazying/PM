@@ -38,15 +38,26 @@ def _task_out(t) -> dict:
 # ---------- TR 模板（建项时选择节点用） ----------
 @router.get("/tr-templates")
 def list_templates(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    from app.models.project import TrTemplateSubnode
     tpls = db.execute(select(TrTemplate).where(TrTemplate.status == "active").order_by(TrTemplate.id)).scalars().all()
     out = []
     for t in tpls:
         nodes = db.execute(
             select(TrTemplateNode).where(TrTemplateNode.template_id == t.id).order_by(TrTemplateNode.sequence)
         ).scalars().all()
+        node_ids = [n.id for n in nodes]
+        sub_rows = db.execute(
+            select(TrTemplateSubnode).where(TrTemplateSubnode.template_node_id.in_(node_ids)).order_by(TrTemplateSubnode.sequence)
+        ).scalars().all() if node_ids else []
+        subs_by_node: dict[int, list] = {}
+        for s in sub_rows:
+            subs_by_node.setdefault(s.template_node_id, []).append({"name": s.name, "sequence": s.sequence})
         out.append({
             "id": t.id, "name": t.name, "description": t.description, "is_builtin": t.is_builtin,
-            "nodes": [{"id": n.id, "node_key": n.node_key, "name": n.name, "sequence": n.sequence, "review_focus": n.review_focus} for n in nodes],
+            "nodes": [{
+                "id": n.id, "node_key": n.node_key, "name": n.name, "sequence": n.sequence,
+                "review_focus": n.review_focus, "subnodes": subs_by_node.get(n.id, []),
+            } for n in nodes],
         })
     return ok(out)
 

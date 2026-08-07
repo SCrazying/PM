@@ -129,10 +129,20 @@ class ProjectService:
     def _instantiate_nodes(self, project: Project, template_node_ids: List[int], node_plans=None) -> None:
         if not template_node_ids:
             return
+        from app.models.project import TrTemplateSubnode
         plan_map = {plan.template_node_id: plan for plan in (node_plans or [])}
         nodes = self.db.execute(
             select(TrTemplateNode).where(TrTemplateNode.id.in_(template_node_ids)).order_by(TrTemplateNode.sequence)
         ).scalars().all()
+        # 模板节点默认子节点（批量取，避免 N+1）
+        tpl_sub_map: dict[int, list[TrTemplateSubnode]] = {}
+        if nodes:
+            tpl_subs = self.db.execute(
+                select(TrTemplateSubnode).where(TrTemplateSubnode.template_node_id.in_([n.id for n in nodes]))
+                .order_by(TrTemplateSubnode.sequence)
+            ).scalars().all()
+            for s in tpl_subs:
+                tpl_sub_map.setdefault(s.template_node_id, []).append(s)
         first_id = None
         for i, tn in enumerate(nodes):
             plan = plan_map.get(tn.id)
@@ -146,6 +156,13 @@ class ProjectService:
             self.db.flush()
             if first_id is None:
                 first_id = node.id
+            # 模板默认子节点 → 实例化为项目子节点（截止时间默认取节点计划完成）
+            for j, ts in enumerate(tpl_sub_map.get(tn.id, []), start=1):
+                self.db.add(ProjectNode(
+                    project_id=project.id, parent_id=node.id, node_key="SUB",
+                    name=ts.name, sequence=j, status="not_started",
+                    planned_end=plan.planned_end if plan else None,
+                ))
         project.current_node_id = first_id
         self.db.flush()
 
