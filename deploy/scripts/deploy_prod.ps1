@@ -1,0 +1,108 @@
+﻿# PM-System 生产一键部署（Windows · 内网免装 Python）
+# 用法：powershell -ExecutionPolicy Bypass -File deploy_prod.ps1
+# 功能：初始化数据库 → 生成配置 → 便携 Python 建表/种子 → NSSM 注册 Windows 服务 → 启动（开机自启）
+# 前置：内网已安装 PostgreSQL 14+（需 postgres 超级用户密码）；本包已内置便携 Python/前端 dist/NSSM
+param(
+    [string]$PgPassword = "",          # PostgreSQL 超级用户密码（不填则交互输入）
+    [int]$Port = 8001,                  # 后端端口（默认 8001）
+    [string]$ServiceName = "pm-system", # Windows 服务名
+    [string]$AppUser = "pm",
+    [string]$AppPassword = "pm123",
+    [string]$DbName = "pm_system",
+    [string]$JwtSecret = ""             # 不填则自动生成随机密钥
+)
+$ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+$Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)  # deploy\scripts\.. → pm-prod
+$Python = Join-Path $Root "runtime\python\python.exe"
+$BackendDir = Join-Path $Root "backend"
+$Nssm = Join-Path $Root "deploy\bin\nssm.exe"
+$InitDb = Join-Path $PSScriptRoot "init_db.ps1"
+
+if (-not (Test-Path $Python)) { throw "未找到便携 Python：$Python（请确认完整拷贝 pm-prod 目录）" }
+if (-not (Test-Path $Nssm)) { throw "未找到 NSSM：$Nssm" }
+
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host "  PM-System 生产一键部署" -ForegroundColor Cyan
+Write-Host "  部署目录: $Root" -ForegroundColor Cyan
+Write-Host "==========================================" -ForegroundColor Cyan
+
+# ---------- 0. 生成 .env ----------
+$envFile = Join-Path $BackendDir ".env"
+if (-not (Test-Path $envFile)) {
+    if (Test-Path (Join-Path $BackendDir ".env.example")) { Copy-Item (Join-Path $BackendDir ".env.example") $envFile }
+}
+if (-not $JwtSecret) {
+    $bytes = New-Object byte[] 48; (New-Object Security.Cryptography.RNGCryptoServiceProvider).GetBytes($bytes)
+    $JwtSecret = [Convert]::ToBase64String($bytes)
+}
+$content = ""
+if (Test-Path $envFile) { $content = Get-Content $envFile -Raw }
+# 覆盖关键项
+$lines = @()
+foreach ($line in ($content -split "`n")) {
+    $k = ($line -split "=")[0].Trim()
+    if ($k -in @("APP_ENV","DATABASE_URL","JWT_SECRET","AI_BASE_URL","AI_API_KEY","CORS_ORIGINS","UPLOAD_DIR","BACKUP_DIR")) { continue }
+    if ($line.Trim()) { $lines += $line.TrimEnd("`r") }
+}
+$lines += "APP_ENV=prod"
+$lines += "PM_SERVE_FRONTEND=1"
+$lines += "DATABASE_URL=postgresql+psycopg2://$AppUser`:$AppPassword@127.0.0.1:5432/$DbName"
+$lines += "JWT_SECRET=$JwtSecret"
+$lines += "AI_BASE_URL="
+$lines += "AI_API_KEY="
+$lines += "CORS_ORIGINS="
+$lines += "UPLOAD_DIR=$Root\data\uploads"
+$lines += "BACKUP_DIR=$Root\data\backups"
+Set-Content -Path $envFile -Value ($lines -join "`r`n") -Encoding UTF8
+Write-Host "[配置] 已生成 $envFile（JWT_SECRET 已随机）" -ForegroundColor Green
+
+# ---------- 1. 数据库初始化（复用 init_db.ps1，幂等） ----------
+Write-Host "[数据库] 检查/初始化 PostgreSQL（需超级用户密码）..." -ForegroundColor Yellow
+& powershell -NoProfile -ExecutionPolicy Bypass -File $InitDb `
+    -PgPassword $PgPassword -AppUser $AppUser -AppPassword $AppPassword -DbName $DbName -BackendDir $BackendDir
+if ($LASTEXITCODE -ne 0) { throw "数据库初始化失败" }
+
+# ---------- 2. 用便携 Python 建表 + 种子（init_db 已做，这里兜底幂等） ----------
+Write-Host "[数据库] 便携 Python 迁移 + 种子 ..." -ForegroundColor Yellow
+Push-Location $BackendDir
+try {
+    & $Python -m alembic upgrade head
+    if ($LASTEXITCODE -ne 0) { throw "迁移失败" }
+    & $Python -m app.seed
+} finally { Pop-Location }
+
+# ---------- 3. NSSM 注册 Windows 服务 ----------
+Write-Host "[服务] 注册 Windows 服务 $ServiceName ..." -ForegroundColor Yellow
+& $Nssm install $ServiceName $Python 2>$null | Out-Null
+& $Nssm set $ServiceName AppDirectory $BackendDir
+& $Nssm set $ServiceName AppParameters "-m uvicorn app.main:app --host 0.0.0.0 --port $Port"
+& $Nssm set $ServiceName DisplayName "PM-System 项目管理系统"
+& $Nssm set $ServiceName Description "内网项目管理系统（FastAPI 后端 + 前端静态伺服）"
+& $Nssm set $ServiceName Start SERVICE_AUTO_START
+& $Nssm set $ServiceName AppStdout "$Root\data\logs\backend.log"
+& $Nssm set $ServiceName AppStderr "$Root\data\logs\backend.err"
+& $Nssm set $ServiceName AppRotateFiles 1
+& $Nssm set $ServiceName AppRotateBytes 10485760
+& $Nssm set $ServiceName AppExit Default Restart
+& $Nssm set $ServiceName AppRestartDelay 5000
+
+# ---------- 4. 启动服务 ----------
+Write-Host "[服务] 启动 $ServiceName ..." -ForegroundColor Yellow
+& $Nssm start $ServiceName
+Start-Sleep -Seconds 6
+$health = try { (Invoke-WebRequest -Uri "http://127.0.0.1:$Port/health" -UseBasicParsing -TimeoutSec 8).StatusCode } catch { 0 }
+
+Write-Host ""
+Write-Host "==========================================" -ForegroundColor Green
+Write-Host "✅ 部署完成"
+Write-Host "   服务名:   $ServiceName（开机自启，重启后无需手动启动）"
+Write-Host "   访问地址: http://<本机IP>:$Port"
+Write-Host "   健康检查: $health"
+Write-Host "   初始账号: admin / admin123（请登录后修改密码）"
+Write-Host "==========================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "管理命令："
+Write-Host "   启动/停止:  net start $ServiceName / net stop $ServiceName"
+Write-Host "   卸载服务:  powershell -File $PSScriptRoot\uninstall_prod.ps1"

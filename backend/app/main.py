@@ -1,8 +1,10 @@
 """FastAPI 应用入口。"""
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -18,6 +20,20 @@ async def lifespan(app: FastAPI):
     logger.info("PM-System backend starting (env=%s)", settings.APP_ENV)
     yield
     logger.info("PM-System backend stopped")
+
+
+def _mount_frontend(app: FastAPI) -> None:
+    """生产/单机模式：后端直接伺服前端 dist（免 Nginx），一个端口 8001 搞定。
+    开发模式（vite 5173）不受影响。"""
+    dist_dir = os.getenv("PM_DIST_DIR", "")
+    if not dist_dir:
+        # 默认相对 backend 上一级的 frontend/dist
+        dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+    if os.path.isdir(dist_dir):
+        app.mount("/", StaticFiles(directory=dist_dir, html=True), name="frontend")
+        logger.info("生产模式：后端伺服前端静态文件 %s", dist_dir)
+    else:
+        logger.info("未找到前端 dist（%s），仅提供 API", dist_dir)
 
 
 def create_app() -> FastAPI:
@@ -47,6 +63,9 @@ def create_app() -> FastAPI:
         return ok({"status": "up"})
 
     app.include_router(api_router, prefix=settings.API_PREFIX)
+    # 静态伺服放最后（catch-all 不抢占 API 路由）
+    if settings.APP_ENV == "prod" or os.getenv("PM_SERVE_FRONTEND") == "1":
+        _mount_frontend(app)
     return app
 
 
