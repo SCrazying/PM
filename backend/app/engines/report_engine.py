@@ -112,6 +112,20 @@ class ReportService:
                 risks.append({"progress_id": p.id, "date": d, "author": uname, "risk": p.risk,
                               "resolved": p.risk_resolved})
 
+        # 全部一级节点（周会"当前节点"列显示所有节点，每行一个）
+        top_nodes = self.db.execute(
+            select(ProjectNode).where(
+                ProjectNode.project_id == project_id, ProjectNode.parent_id.is_(None),
+                ProjectNode.is_deleted.is_(False),
+            ).order_by(ProjectNode.sequence)
+        ).scalars().all()
+        nodes = [{
+            "id": n.id, "node_key": n.node_key, "name": n.name, "status": n.status,
+            "planned_end": n.planned_end,
+            "overdue": bool(n.status != "passed" and n.planned_end and n.planned_end < date.today()),
+            "is_current": n.id == project.current_node_id,
+        } for n in top_nodes]
+
         # 当前节点 + 全部节点子节点（周会视图按节点分组展示全部子节点）
         current_node = None
         subnodes = []
@@ -125,12 +139,6 @@ class ReportService:
                 }
         # 全部顶层节点及其子节点（仅含有子节点的节点）
         node_subnodes = []
-        top_nodes = self.db.execute(
-            select(ProjectNode).where(
-                ProjectNode.project_id == project_id, ProjectNode.parent_id.is_(None),
-                ProjectNode.is_deleted.is_(False),
-            ).order_by(ProjectNode.sequence)
-        ).scalars().all()
         top_ids = [n.id for n in top_nodes]
         if top_ids:
             sub_rows = self.db.execute(
@@ -161,7 +169,7 @@ class ReportService:
             "project": {"id": project.id, "name": project.name, "code": project.code,
                         "machine_model": project.machine_model, "health": project.health,
                         "status": project.status, "current_node": current_node,
-                        "project_roles": role_text},
+                        "nodes": nodes, "project_roles": role_text},
             "week_start": ws, "week_end": we,
             "weekly_goal": goal_row.goal if goal_row else None,
             "tasks": week_tasks,

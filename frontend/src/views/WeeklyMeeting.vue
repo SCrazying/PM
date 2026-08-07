@@ -86,16 +86,16 @@
             <span class="role-summary">{{ row.project.project_roles || '未分配' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="当前节点" min-width="190">
+        <el-table-column label="当前节点" min-width="210">
           <template #default="{ row }">
-            <template v-if="row.project.current_node">
-              <div class="cn-line">
-                <el-tag size="small" effect="plain">{{ row.project.current_node.node_key }}</el-tag>
-                <el-tag v-if="row.project.current_node.overdue" size="small" type="warning" style="margin-left:4px">超期</el-tag>
+            <div v-if="row.project.nodes && row.project.nodes.length" class="cn-list">
+              <div v-for="n in row.project.nodes" :key="n.id" class="cn-row" :class="{ current: n.is_current, done: n.status==='passed' }">
+                <el-tag size="small" effect="plain"
+                        :type="n.is_current ? 'primary' : (n.status==='passed' ? 'success' : 'info')">{{ n.node_key }}</el-tag>
+                <el-tag v-if="n.overdue" size="small" type="warning">超期</el-tag>
+                <span class="cn-date">{{ n.planned_end || '' }}</span>
               </div>
-              <div class="cn-name">{{ row.project.current_node.name }}</div>
-              <div v-if="row.project.current_node.planned_end" class="pm-sub node-deadline">计划至 {{ row.project.current_node.planned_end }}</div>
-            </template>
+            </div>
             <span v-else class="pm-sub">未设置</span>
           </template>
         </el-table-column>
@@ -288,9 +288,11 @@ onMounted(load)
 .pp-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .subnode-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .sub-inline-list { display: flex; flex-direction: column; gap: 2px; }
-.cn-line { display: flex; align-items: center; }
-.cn-name { font-size: 13px; line-height: 1.4; margin-top: 3px; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }
-.node-deadline { margin-top: 2px; }
+.cn-list { display: flex; flex-direction: column; gap: 3px; }
+.cn-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 2px 4px; border-radius: 6px; }
+.cn-row.current { background: var(--pm-primary-light); }
+.cn-row.done .cn-date { color: var(--pm-success); }
+.cn-date { color: var(--pm-text-3); white-space: nowrap; }
 .sub-inline { display: flex; align-items: flex-start; gap: 5px; padding: 3px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
 .sub-inline:hover { background: var(--pm-primary-light); }
 .sub-inline.done { background: #e9f9f0; }
