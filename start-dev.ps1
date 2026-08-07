@@ -1,4 +1,4 @@
-﻿# PM-System 开发环境一键启动（PowerShell）
+﻿﻿# PM-System 开发环境一键启动（PowerShell）
 # 用法：右键“使用 PowerShell 运行”，或执行
 #   powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
 #
@@ -44,6 +44,28 @@ if ($LASTEXITCODE -ne 0) {
 if (-not (Test-Path "backend\.env")) {
     Write-Host "[初始化] 生成后端 .env（请按需修改数据库/JWT 配置）" -ForegroundColor Yellow
     Copy-Item backend\.env.example backend\.env
+}
+
+# ---------- 数据库初始化检查（首次自动初始化） ----------
+Write-Host "[检查] 数据库连接..." -ForegroundColor Yellow
+$dbOk = $false
+Push-Location backend
+try {
+    & $python -c "from app.core.config import settings; from sqlalchemy import create_engine; e=create_engine(settings.DATABASE_URL); c=e.connect(); c.close(); print('db-ok')" 2>$null | Select-String -Quiet "db-ok" | Out-Null
+    if ($LASTEXITCODE -eq 0) { $dbOk = $true }
+} catch { $dbOk = $false }
+Pop-Location
+
+if (-not $dbOk) {
+    Write-Host "[初始化] 数据库未就绪，运行数据库初始化脚本（首次需输入 PostgreSQL 超级用户密码）..." -ForegroundColor Yellow
+    & powershell -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot\deploy\scripts\init_db.ps1"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[错误] 数据库初始化失败，请检查 init_db.ps1 输出。" -ForegroundColor Red
+        Read-Host "按回车退出"
+        exit 1
+    }
+} else {
+    Write-Host "[检查] 数据库已就绪" -ForegroundColor Green
 }
 
 # ---------- 启动后端 ----------
