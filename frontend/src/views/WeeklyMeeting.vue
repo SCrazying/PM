@@ -86,7 +86,7 @@
             <span class="role-summary">{{ row.project.project_roles || '未分配' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="当前节点" min-width="210">
+        <el-table-column label="当前节点" min-width="200">
           <template #default="{ row }">
             <div v-if="row.project.nodes && row.project.nodes.length" class="cn-list">
               <div v-for="n in row.project.nodes" :key="n.id" class="cn-row" :class="{ current: n.is_current, done: n.status==='passed' }">
@@ -287,20 +287,19 @@ onMounted(load)
 .empty { color: var(--pm-text-3); font-size: 13px; padding: 8px 0; }
 .pp-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .subnode-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-.sub-inline-list { display: flex; flex-direction: column; gap: 2px; }
-.cn-list { display: flex; flex-direction: column; gap: 3px; }
-.cn-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 2px 4px; border-radius: 6px; }
+.sub-inline-list, .cn-list { display: flex; flex-direction: column; gap: 3px; }
+.cn-row, .sub-inline { display: flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 2px 4px; border-radius: 6px; min-height: 26px; box-sizing: border-box; }
 .cn-row.current { background: var(--pm-primary-light); }
 .cn-row.done .cn-date { color: var(--pm-success); }
-.cn-date { color: var(--pm-text-3); white-space: nowrap; }
-.sub-inline { display: flex; align-items: flex-start; gap: 5px; padding: 3px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
+.cn-date { color: var(--pm-text-3); white-space: nowrap; flex-shrink: 0; }
+.sub-inline { cursor: pointer; }
 .sub-inline:hover { background: var(--pm-primary-light); }
 .sub-inline.done { background: #e9f9f0; }
 .sub-inline.done .si-name { color: var(--pm-success); text-decoration: line-through; }
 .sub-inline.done .el-icon { color: var(--pm-success); }
-.sub-inline .el-icon { color: var(--pm-primary); flex-shrink: 0; margin-top: 1px; }
+.sub-inline .el-icon { color: var(--pm-primary); flex-shrink: 0; }
 .si-name { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; line-height: 1.4; }
-.si-date { color: var(--pm-text-3); font-size: 11.5px; white-space: nowrap; }
+.si-date { color: var(--pm-text-3); font-size: 11.5px; white-space: nowrap; flex-shrink: 0; }
 .si-overdue { color: var(--pm-danger); font-weight: 600; }
 
 .daily-inline { display: flex; flex-direction: column; gap: 4px; }
