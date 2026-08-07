@@ -30,6 +30,12 @@ class ProjectService:
         p = self.db.execute(q).scalar_one_or_none()
         if not p:
             raise NotFoundError("项目不存在")
+        # 数据兜底修复：current_node_id 误指向子节点时，按顶层节点规则纠正（历史脏数据）
+        if p.current_node_id:
+            cur = self.db.get(ProjectNode, p.current_node_id)
+            if cur and cur.parent_id is not None:
+                self._refresh_current_node(p)
+                self.db.commit()
         return p
 
     def check_owner(self, project: Project, user: dict) -> None:

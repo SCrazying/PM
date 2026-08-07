@@ -36,9 +36,13 @@ class NodeFlowService:
                 raise ForbiddenError("仅项目负责人或管理员可操作")
 
     def _refresh_current_node(self, project: Project) -> None:
+        # 仅顶层节点参与 current_node_id 判定，子节点不作为当前节点
         nodes = list(self.db.execute(
-            select(ProjectNode).where(ProjectNode.project_id == project.id, ProjectNode.is_deleted.is_(False))
-            .order_by(ProjectNode.sequence)
+            select(ProjectNode).where(
+                ProjectNode.project_id == project.id,
+                ProjectNode.parent_id.is_(None),
+                ProjectNode.is_deleted.is_(False),
+            ).order_by(ProjectNode.sequence)
         ).scalars().all())
         current = next((n for n in nodes if n.status != "passed"), nodes[-1] if nodes else None)
         project.current_node_id = current.id if current else None
