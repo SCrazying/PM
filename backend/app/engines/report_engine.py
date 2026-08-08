@@ -189,13 +189,16 @@ class ReportService:
                 "weekly_goal": self.project_weekly(p.id, week_start)["weekly_goal"]} for p in projects]
 
     # ---------- 项目台账 Excel 导出（M5） ----------
-    def export_ledger_xlsx(self, week_start: date) -> BytesIO:
-        """按成员一行导出固定 7 列项目台账。"""
+    def export_ledger_xlsx(self, week_start: date, scope: str = "weekly") -> BytesIO:
+        """按成员一行导出固定 7 列项目台账。
+        scope=weekly：本周台账（任务/进展仅本周，周目标取本周）；
+        scope=all：项目台账（任务/进展为项目全部周合集，周目标取最近一周）。"""
         ws_start, ws_end = self._week_range(week_start)
         wb = Workbook()
         ws = wb.active
         ws.title = "项目台账"
-        headers = ["机型", "项目", "是否投入", "项目角色", "关键节点", "周目标", "本周任务"]
+        task_header = "本周任务" if scope == "weekly" else "项目任务"
+        headers = ["机型", "项目", "是否投入", "项目角色", "关键节点", "周目标", task_header]
         widths = [14, 24, 12, 22, 18, 30, 52]
         header_fill = PatternFill("solid", fgColor="4F6EF7")
         header_font = Font(bold=True, color="FFFFFF", size=11)
@@ -218,11 +221,20 @@ class ReportService:
         row_no = 2
         for project in projects:
             current = self.db.get(ProjectNode, project.current_node_id) if project.current_node_id else None
-            goal = self.db.execute(select(ProjectWeeklyGoal).where(
-                ProjectWeeklyGoal.project_id == project.id,
-                ProjectWeeklyGoal.week_start == ws_start,
-                ProjectWeeklyGoal.is_deleted.is_(False),
-            )).scalar_one_or_none()
+            if scope == "all":
+                # 最近一周目标
+                goal = self.db.execute(
+                    select(ProjectWeeklyGoal).where(
+                        ProjectWeeklyGoal.project_id == project.id,
+                        ProjectWeeklyGoal.is_deleted.is_(False),
+                    ).order_by(ProjectWeeklyGoal.week_start.desc())
+                ).scalars().first()
+            else:
+                goal = self.db.execute(select(ProjectWeeklyGoal).where(
+                    ProjectWeeklyGoal.project_id == project.id,
+                    ProjectWeeklyGoal.week_start == ws_start,
+                    ProjectWeeklyGoal.is_deleted.is_(False),
+                )).scalar_one_or_none()
             members = self.db.execute(
                 select(ProjectMember, User.display_name).join(User, User.id == ProjectMember.user_id).where(
                     ProjectMember.project_id == project.id,
@@ -242,11 +254,13 @@ class ReportService:
                         Task.is_deleted.is_(False),
                     )).scalars().all()
                     member_tasks = [f"{'✓' if t.status == 'done' else '○'} {t.title}" for t in tasks]
-                    progresses = self.db.execute(select(Progress).where(
+                    pq = select(Progress).where(
                         Progress.project_id == project.id, Progress.author_id == member.user_id,
-                        Progress.progress_date >= ws_start, Progress.progress_date <= ws_end,
                         Progress.is_deleted.is_(False),
-                    ).order_by(Progress.progress_date)).scalars().all()
+                    )
+                    if scope == "weekly":
+                        pq = pq.where(Progress.progress_date >= ws_start, Progress.progress_date <= ws_end)
+                    progresses = self.db.execute(pq.order_by(Progress.progress_date)).scalars().all()
                     member_progress = [f"[{p.progress_date}] {p.today_work}" for p in progresses]
                 task_text = "\n".join(member_tasks + member_progress)
                 values = [

@@ -12,6 +12,7 @@
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="weekly">导出本周台账</el-dropdown-item>
+            <el-dropdown-item command="project">导出项目台账（每周任务合集）</el-dropdown-item>
             <el-dropdown-item command="completion">导出项目完成台账</el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -273,7 +274,9 @@ async function downloadLedger(type = 'weekly') {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = type === 'completion' ? '项目完成台账.xlsx' : `本周台账_${weekStart.value}.xlsx`
+    link.download = type === 'completion' ? '项目完成台账.xlsx'
+      : type === 'project' ? '项目台账.xlsx'
+      : `本周台账_${weekStart.value}.xlsx`
     link.click()
     URL.revokeObjectURL(url)
   } finally {
