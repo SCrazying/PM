@@ -30,8 +30,25 @@ def _mount_frontend(app: FastAPI) -> None:
         # 默认相对 backend 上一级的 frontend/dist
         dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
     if os.path.isdir(dist_dir):
-        app.mount("/", StaticFiles(directory=dist_dir, html=True), name="frontend")
-        logger.info("生产模式：后端伺服前端静态文件 %s", dist_dir)
+        from fastapi.responses import FileResponse, JSONResponse
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa(full_path: str):
+            # API/文档路径未匹配时返回 JSON 404，不回退到前端
+            if full_path == "health" or full_path.startswith("api/") or full_path.startswith("docs") or full_path.startswith("openapi"):
+                return JSONResponse({"code": 404, "message": "接口不存在"}, status_code=404)
+            # 真实存在的静态资源直接返回（assets/js/css 等）
+            if full_path:
+                candidate = os.path.normpath(os.path.join(dist_dir, full_path))
+                if candidate.startswith(dist_dir) and os.path.isfile(candidate):
+                    return FileResponse(candidate)
+            # SPA 路由回退到 index.html（支持 F5 刷新 /board /projects 等）
+            index = os.path.join(dist_dir, "index.html")
+            if os.path.isfile(index):
+                return FileResponse(index)
+            return JSONResponse({"code": 404, "message": "not found"}, status_code=404)
+
+        logger.info("生产模式：SPA 伺服前端 %s", dist_dir)
     else:
         logger.info("未找到前端 dist（%s），仅提供 API", dist_dir)
 
