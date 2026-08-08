@@ -1,34 +1,34 @@
-ï»¿# PM-System ç”Ÿäº§ä¸€é”®éƒ¨ç½²ï¼ˆWindows Â· å†…ç½‘å…è£… Pythonï¼‰
-# ç”¨æ³•ï¼špowershell -ExecutionPolicy Bypass -File deploy_prod.ps1
-# åŠŸèƒ½ï¼šåˆå§‹åŒ–æ•°æ®åº“ â†’ ç”Ÿæˆé…ç½® â†’ ä¾¿æº Python å»ºè¡¨/ç§å­ â†’ NSSM æ³¨å†Œ Windows æœåŠ¡ â†’ å¯åŠ¨ï¼ˆå¼€æœºè‡ªå¯ï¼‰
-# å‰ç½®ï¼šå†…ç½‘å·²å®‰è£… PostgreSQL 14+ï¼ˆéœ€ postgres è¶…çº§ç”¨æˆ·å¯†ç ï¼‰ï¼›æœ¬åŒ…å·²å†…ç½®ä¾¿æº Python/å‰ç«¯ dist/NSSM
+# PM-System Éú²úÒ»¼ü²¿Êğ£¨Windows ¡¤ ÄÚÍøÃâ×° Python£©
+# ÓÃ·¨£ºpowershell -ExecutionPolicy Bypass -File deploy_prod.ps1
+# ¹¦ÄÜ£º³õÊ¼»¯Êı¾İ¿â ¡ú Éú³ÉÅäÖÃ ¡ú ±ãĞ¯ Python ½¨±í/ÖÖ×Ó ¡ú NSSM ×¢²á Windows ·şÎñ ¡ú Æô¶¯£¨¿ª»ú×ÔÆô£©
+# Ç°ÖÃ£ºÄÚÍøÒÑ°²×° PostgreSQL 14+£¨Ğè postgres ³¬¼¶ÓÃ»§ÃÜÂë£©£»±¾°üÒÑÄÚÖÃ±ãĞ¯ Python/Ç°¶Ë dist/NSSM
 param(
-    [string]$PgPassword = "",          # PostgreSQL è¶…çº§ç”¨æˆ·å¯†ç ï¼ˆä¸å¡«åˆ™äº¤äº’è¾“å…¥ï¼‰
-    [int]$Port = 8001,                  # åç«¯ç«¯å£ï¼ˆé»˜è®¤ 8001ï¼‰
-    [string]$ServiceName = "pm-system", # Windows æœåŠ¡å
+    [string]$PgPassword = "postgres",    # PostgreSQL ³¬¼¶ÓÃ»§ÃÜÂë£¨ÄÚÍøÄ¬ÈÏ postgres£©
+    [int]$Port = 8001,                  # ºó¶Ë¶Ë¿Ú£¨Ä¬ÈÏ 8001£©
+    [string]$ServiceName = "pm-system", # Windows ·şÎñÃû
     [string]$AppUser = "pm",
-    [string]$AppPassword = "pm123",
+    [string]$AppPassword = "postgres",  # Êı¾İ¿âÓ¦ÓÃÃÜÂë£¨ÄÚÍøÍ³Ò» postgres£©
     [string]$DbName = "pm_system",
-    [string]$JwtSecret = ""             # ä¸å¡«åˆ™è‡ªåŠ¨ç”Ÿæˆéšæœºå¯†é’¥
+    [string]$JwtSecret = ""             # ²»ÌîÔò×Ô¶¯Éú³ÉËæ»úÃÜÔ¿
 )
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-$Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)  # deploy\scripts\.. â†’ pm-prod
+$Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)  # deploy\scripts\.. ¡ú pm-prod
 $Python = Join-Path $Root "runtime\python\python.exe"
 $BackendDir = Join-Path $Root "backend"
 $Nssm = Join-Path $Root "deploy\bin\nssm.exe"
 $InitDb = Join-Path $PSScriptRoot "init_db.ps1"
 
-if (-not (Test-Path $Python)) { throw "æœªæ‰¾åˆ°ä¾¿æº Pythonï¼š$Pythonï¼ˆè¯·ç¡®è®¤å®Œæ•´æ‹·è´ pm-prod ç›®å½•ï¼‰" }
-if (-not (Test-Path $Nssm)) { throw "æœªæ‰¾åˆ° NSSMï¼š$Nssm" }
+if (-not (Test-Path $Python)) { throw "Î´ÕÒµ½±ãĞ¯ Python£º$Python£¨ÇëÈ·ÈÏÍêÕû¿½±´ pm-prod Ä¿Â¼£©" }
+if (-not (Test-Path $Nssm)) { throw "Î´ÕÒµ½ NSSM£º$Nssm" }
 
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "  PM-System ç”Ÿäº§ä¸€é”®éƒ¨ç½²" -ForegroundColor Cyan
-Write-Host "  éƒ¨ç½²ç›®å½•: $Root" -ForegroundColor Cyan
+Write-Host "  PM-System Éú²úÒ»¼ü²¿Êğ" -ForegroundColor Cyan
+Write-Host "  ²¿ÊğÄ¿Â¼: $Root" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
-# ---------- 0. ç”Ÿæˆ .env ----------
+# ---------- 0. Éú³É .env ----------
 $envFile = Join-Path $BackendDir ".env"
 if (-not (Test-Path $envFile)) {
     if (Test-Path (Join-Path $BackendDir ".env.example")) { Copy-Item (Join-Path $BackendDir ".env.example") $envFile }
@@ -39,7 +39,7 @@ if (-not $JwtSecret) {
 }
 $content = ""
 if (Test-Path $envFile) { $content = Get-Content $envFile -Raw }
-# è¦†ç›–å…³é”®é¡¹
+# ¸²¸Ç¹Ø¼üÏî
 $lines = @()
 foreach ($line in ($content -split "`n")) {
     $k = ($line -split "=")[0].Trim()
@@ -56,34 +56,34 @@ $lines += "CORS_ORIGINS="
 $lines += "UPLOAD_DIR=$Root\data\uploads"
 $lines += "BACKUP_DIR=$Root\data\backups"
 Set-Content -Path $envFile -Value ($lines -join "`r`n") -Encoding UTF8
-Write-Host "[é…ç½®] å·²ç”Ÿæˆ $envFileï¼ˆJWT_SECRET å·²éšæœºï¼‰" -ForegroundColor Green
+Write-Host "[ÅäÖÃ] ÒÑÉú³É $envFile£¨JWT_SECRET ÒÑËæ»ú£©" -ForegroundColor Green
 
-# ---------- 1. æ•°æ®åº“åˆå§‹åŒ–ï¼ˆå¤ç”¨ init_db.ps1ï¼Œå¹‚ç­‰ï¼‰ ----------
-Write-Host "[æ•°æ®åº“] æ£€æŸ¥/åˆå§‹åŒ– PostgreSQLï¼ˆéœ€è¶…çº§ç”¨æˆ·å¯†ç ï¼‰..." -ForegroundColor Yellow
+# ---------- 1. Êı¾İ¿â³õÊ¼»¯£¨¸´ÓÃ init_db.ps1£¬ÃİµÈ£© ----------
+Write-Host "[Êı¾İ¿â] ¼ì²é/³õÊ¼»¯ PostgreSQL£¨Ğè³¬¼¶ÓÃ»§ÃÜÂë£©..." -ForegroundColor Yellow
 & powershell -NoProfile -ExecutionPolicy Bypass -File $InitDb `
     -PgPassword $PgPassword -AppUser $AppUser -AppPassword $AppPassword -DbName $DbName `
     -BackendDir $BackendDir -Python $Python
-if ($LASTEXITCODE -ne 0) { throw "æ•°æ®åº“åˆå§‹åŒ–å¤±è´¥" }
+if ($LASTEXITCODE -ne 0) { throw "Êı¾İ¿â³õÊ¼»¯Ê§°Ü" }
 
-# ---------- 2. ç”¨ä¾¿æº Python å»ºè¡¨ + ç§å­ï¼ˆinit_db å·²åšï¼Œè¿™é‡Œå…œåº•å¹‚ç­‰ï¼‰ ----------
-Write-Host "[æ•°æ®åº“] ä¾¿æº Python è¿ç§» + ç§å­ ..." -ForegroundColor Yellow
+# ---------- 2. ÓÃ±ãĞ¯ Python ½¨±í + ÖÖ×Ó£¨init_db ÒÑ×ö£¬ÕâÀï¶µµ×ÃİµÈ£© ----------
+Write-Host "[Êı¾İ¿â] ±ãĞ¯ Python Ç¨ÒÆ + ÖÖ×Ó ..." -ForegroundColor Yellow
 Push-Location $BackendDir
 try {
     & $Python -m alembic upgrade head
-    if ($LASTEXITCODE -ne 0) { throw "è¿ç§»å¤±è´¥" }
-    # ä¾¿æº Python çš„ embeddable ç‰¹æ€§ï¼š-m ä¸ä¼šæŠŠå½“å‰ç›®å½•åŠ å…¥ sys.pathï¼Œé¡»ç”¨ -c + sys.path.insert å¯¼å…¥ app
+    if ($LASTEXITCODE -ne 0) { throw "Ç¨ÒÆÊ§°Ü" }
+    # ±ãĞ¯ Python µÄ embeddable ÌØĞÔ£º-m ²»»á°Ñµ±Ç°Ä¿Â¼¼ÓÈë sys.path£¬ĞëÓÃ -c + sys.path.insert µ¼Èë app
     $PyDir = $BackendDir.Replace('\', '/')
     & $Python -c "import sys; sys.path.insert(0, r'$PyDir'); from app.seed import run; sys.exit(run())"
-    if ($LASTEXITCODE -ne 0) { throw "ç§å­æ•°æ®å†™å…¥å¤±è´¥" }
+    if ($LASTEXITCODE -ne 0) { throw "ÖÖ×ÓÊı¾İĞ´ÈëÊ§°Ü" }
 } finally { Pop-Location }
 
-# ---------- 3. NSSM æ³¨å†Œ Windows æœåŠ¡ ----------
-Write-Host "[æœåŠ¡] æ³¨å†Œ Windows æœåŠ¡ $ServiceName ..." -ForegroundColor Yellow
+# ---------- 3. NSSM ×¢²á Windows ·şÎñ ----------
+Write-Host "[·şÎñ] ×¢²á Windows ·şÎñ $ServiceName ..." -ForegroundColor Yellow
 & $Nssm install $ServiceName $Python 2>$null | Out-Null
 & $Nssm set $ServiceName AppDirectory $BackendDir
 & $Nssm set $ServiceName AppParameters "-m uvicorn app.main:app --host 0.0.0.0 --port $Port"
-& $Nssm set $ServiceName DisplayName "PM-System é¡¹ç›®ç®¡ç†ç³»ç»Ÿ"
-& $Nssm set $ServiceName Description "å†…ç½‘é¡¹ç›®ç®¡ç†ç³»ç»Ÿï¼ˆFastAPI åç«¯ + å‰ç«¯é™æ€ä¼ºæœï¼‰"
+& $Nssm set $ServiceName DisplayName "PM-System ÏîÄ¿¹ÜÀíÏµÍ³"
+& $Nssm set $ServiceName Description "ÄÚÍøÏîÄ¿¹ÜÀíÏµÍ³£¨FastAPI ºó¶Ë + Ç°¶Ë¾²Ì¬ËÅ·ş£©"
 & $Nssm set $ServiceName Start SERVICE_AUTO_START
 & $Nssm set $ServiceName AppStdout "$Root\data\logs\backend.log"
 & $Nssm set $ServiceName AppStderr "$Root\data\logs\backend.err"
@@ -92,21 +92,21 @@ Write-Host "[æœåŠ¡] æ³¨å†Œ Windows æœåŠ¡ $ServiceName ..." -ForegroundColor Ye
 & $Nssm set $ServiceName AppExit Default Restart
 & $Nssm set $ServiceName AppRestartDelay 5000
 
-# ---------- 4. å¯åŠ¨æœåŠ¡ ----------
-Write-Host "[æœåŠ¡] å¯åŠ¨ $ServiceName ..." -ForegroundColor Yellow
+# ---------- 4. Æô¶¯·şÎñ ----------
+Write-Host "[·şÎñ] Æô¶¯ $ServiceName ..." -ForegroundColor Yellow
 & $Nssm start $ServiceName
 Start-Sleep -Seconds 6
 $health = try { (Invoke-WebRequest -Uri "http://127.0.0.1:$Port/health" -UseBasicParsing -TimeoutSec 8).StatusCode } catch { 0 }
 
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Green
-Write-Host "âœ… éƒ¨ç½²å®Œæˆ"
-Write-Host "   æœåŠ¡å:   $ServiceNameï¼ˆå¼€æœºè‡ªå¯ï¼Œé‡å¯åæ— éœ€æ‰‹åŠ¨å¯åŠ¨ï¼‰"
-Write-Host "   è®¿é—®åœ°å€: http://<æœ¬æœºIP>:$Port"
-Write-Host "   å¥åº·æ£€æŸ¥: $health"
-Write-Host "   åˆå§‹è´¦å·: admin / admin123ï¼ˆè¯·ç™»å½•åä¿®æ”¹å¯†ç ï¼‰"
+Write-Host "[OK] ²¿ÊğÍê³É"
+Write-Host "   ·şÎñÃû:   $ServiceName£¨¿ª»ú×ÔÆô£¬ÖØÆôºóÎŞĞèÊÖ¶¯Æô¶¯£©"
+Write-Host "   ·ÃÎÊµØÖ·: http://<±¾»úIP>:$Port"
+Write-Host "   ½¡¿µ¼ì²é: $health"
+Write-Host "   ³õÊ¼ÕËºÅ: admin / admin123£¨ÇëµÇÂ¼ºóĞŞ¸ÄÃÜÂë£©"
 Write-Host "==========================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "ç®¡ç†å‘½ä»¤ï¼š"
-Write-Host "   å¯åŠ¨/åœæ­¢:  net start $ServiceName / net stop $ServiceName"
-Write-Host "   å¸è½½æœåŠ¡:  powershell -File $PSScriptRoot\uninstall_prod.ps1"
+Write-Host "¹ÜÀíÃüÁî£º"
+Write-Host "   Æô¶¯/Í£Ö¹:  net start $ServiceName / net stop $ServiceName"
+Write-Host "   Ğ¶ÔØ·şÎñ:  powershell -File $PSScriptRoot\uninstall_prod.ps1"

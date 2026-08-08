@@ -1,10 +1,10 @@
-ï»¿# PM-System æ•°æ®åº“åˆå§‹åŒ–ï¼ˆWindowsï¼‰
+# PM-System Êı¾İ¿â³õÊ¼»¯£¨Windows£©
 
-# ç”¨æ³•ï¼špowershell -ExecutionPolicy Bypass -File deploy\scripts\init_db.ps1
+# ÓÃ·¨£ºpowershell -ExecutionPolicy Bypass -File deploy\scripts\init_db.ps1
 
-# åŠŸèƒ½ï¼šå¹‚ç­‰åˆ›å»ºåº”ç”¨ç”¨æˆ·/æ•°æ®åº“ â†’ æ‰§è¡Œ Alembic è¿ç§»å»ºè¡¨ â†’ å†™å…¥ç§å­æ•°æ®(å†…ç½®TRæ¨¡æ¿/ç®¡ç†å‘˜/é…ç½®)
+# ¹¦ÄÜ£ºÃİµÈ´´½¨Ó¦ÓÃÓÃ»§/Êı¾İ¿â ¡ú Ö´ĞĞ Alembic Ç¨ÒÆ½¨±í ¡ú Ğ´ÈëÖÖ×ÓÊı¾İ(ÄÚÖÃTRÄ£°å/¹ÜÀíÔ±/ÅäÖÃ)
 
-# å‰ç½®ï¼šæœ¬æœºå·²å®‰è£… PostgreSQL 14+ ä¸ Pythonï¼ˆå«åç«¯ä¾èµ–ï¼‰
+# Ç°ÖÃ£º±¾»úÒÑ°²×° PostgreSQL 14+ Óë Python£¨º¬ºó¶ËÒÀÀµ£©
 
 param(
 
@@ -18,7 +18,7 @@ param(
 
     [string]$AppUser = "pm",
 
-    [string]$AppPassword = "pm123",
+    [string]$AppPassword = "postgres",
 
     [string]$DbName = "pm_system",
 
@@ -26,7 +26,7 @@ param(
 
     [string]$BackendDir = "",
 
-    [string]$Python = ""    # ä¾¿æº Python è·¯å¾„ï¼ˆå†…ç½‘æœªè£… Python æ—¶ä¼ å…¥ï¼Œç”¨äºè¿ç§»/ç§å­ï¼‰
+    [string]$Python = ""    # ±ãĞ¯ Python Â·¾¶£¨ÄÚÍøÎ´×° Python Ê±´«Èë£¬ÓÃÓÚÇ¨ÒÆ/ÖÖ×Ó£©
 
 )
 
@@ -44,7 +44,7 @@ function Find-Psql {
 
     if (Get-Command psql -ErrorAction SilentlyContinue) { return (Get-Command psql).Source }
 
-    # å¸¸è§å®‰è£…è·¯å¾„ï¼šC:\Program Files\PostgreSQL\<version>\bin\psql.exe
+    # ³£¼û°²×°Â·¾¶£ºC:\Program Files\PostgreSQL\<version>\bin\psql.exe
 
     $root = "C:\Program Files\PostgreSQL"
 
@@ -62,7 +62,7 @@ function Find-Psql {
 
     }
 
-    throw "æœªæ‰¾åˆ° psqlï¼Œè¯·ç”¨ -Psql å‚æ•°æŒ‡å®š psql.exe è·¯å¾„ï¼ˆæˆ–æŠŠ PostgreSQL bin åŠ å…¥ PATHï¼‰"
+    throw "Î´ÕÒµ½ psql£¬ÇëÓÃ -Psql ²ÎÊıÖ¸¶¨ psql.exe Â·¾¶£¨»ò°Ñ PostgreSQL bin ¼ÓÈë PATH£©"
 
 }
 
@@ -72,11 +72,11 @@ $Psql = Find-Psql $Psql
 
 if (-not $PgPassword) {
 
-    $PgPassword = Read-Host "è¯·è¾“å…¥ PostgreSQL è¶…çº§ç”¨æˆ·($PgUser)å¯†ç "
+    $PgPassword = Read-Host "ÇëÊäÈë PostgreSQL ³¬¼¶ÓÃ»§($PgUser)ÃÜÂë"
 
 }
 
-# è®¾ç½®å¯†ç ç¯å¢ƒå˜é‡ï¼Œé¿å… psql äº¤äº’å¼æç¤ºå¯†ç 
+# ÉèÖÃÃÜÂë»·¾³±äÁ¿£¬±ÜÃâ psql ½»»¥Ê½ÌáÊ¾ÃÜÂë
 
 $env:PGPASSWORD = $PgPassword
 
@@ -90,7 +90,7 @@ $BackendDir = [System.IO.Path]::GetFullPath($BackendDir)
 
 if (-not (Test-Path (Join-Path $BackendDir "alembic.ini"))) {
 
-    throw "åç«¯ç›®å½•ä¸æ­£ç¡®ï¼š$BackendDirï¼ˆç¼ºå°‘ alembic.iniï¼‰"
+    throw "ºó¶ËÄ¿Â¼²»ÕıÈ·£º$BackendDir£¨È±ÉÙ alembic.ini£©"
 
 }
 
@@ -98,17 +98,17 @@ if (-not (Test-Path (Join-Path $BackendDir "alembic.ini"))) {
 
 Write-Host "==> psql:      $Psql" -ForegroundColor Cyan
 
-Write-Host "==> åç«¯ç›®å½•:  $BackendDir" -ForegroundColor Cyan
+Write-Host "==> ºó¶ËÄ¿Â¼:  $BackendDir" -ForegroundColor Cyan
 
-Write-Host "==> ç›®æ ‡åº“:    $DbNameï¼ˆç”¨æˆ· $AppUserï¼‰" -ForegroundColor Cyan
+Write-Host "==> Ä¿±ê¿â:    $DbName£¨ÓÃ»§ $AppUser£©" -ForegroundColor Cyan
 
 
 
-# 1. å»ºåº”ç”¨ç”¨æˆ·ä¸æ•°æ®åº“ï¼ˆå¹‚ç­‰ï¼‰
+# 1. ½¨Ó¦ÓÃÓÃ»§ÓëÊı¾İ¿â£¨ÃİµÈ£©
 
-Write-Host "==> æ£€æŸ¥/åˆ›å»ºç”¨æˆ· $AppUser ..." -ForegroundColor Yellow
+Write-Host "==> ¼ì²é/´´½¨ÓÃ»§ $AppUser ..." -ForegroundColor Yellow
 
-# æ³¨æ„ï¼špsql æŸ¥è¯¢æ— ç»“æœ/è¿æ¥å¤±è´¥æ—¶è¾“å‡ºå¯èƒ½ä¸º nullï¼Œå…ˆ Out-String å† Trimï¼Œé¿å…"å¯¹ Null å€¼è°ƒç”¨æ–¹æ³•"
+# ×¢Òâ£ºpsql ²éÑ¯ÎŞ½á¹û/Á¬½ÓÊ§°ÜÊ±Êä³ö¿ÉÄÜÎª null£¬ÏÈ Out-String ÔÙ Trim£¬±ÜÃâ"¶Ô Null Öµµ÷ÓÃ·½·¨"
 
 $roleOut = (& $Psql -h $PgHost -p $PgPort -U $PgUser -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='$AppUser'" 2>$null) | Out-String
 
@@ -118,17 +118,17 @@ if (-not $roleExists) {
 
     & $Psql -h $PgHost -p $PgPort -U $PgUser -d postgres -c "CREATE USER $AppUser WITH PASSWORD '$AppPassword'"
 
-    Write-Host "   å·²åˆ›å»ºç”¨æˆ· $AppUser" -ForegroundColor Green
+    Write-Host "   ÒÑ´´½¨ÓÃ»§ $AppUser" -ForegroundColor Green
 
 } else {
 
-    Write-Host "   ç”¨æˆ·å·²å­˜åœ¨ï¼Œè·³è¿‡" -ForegroundColor DarkGray
+    Write-Host "   ÓÃ»§ÒÑ´æÔÚ£¬Ìø¹ı" -ForegroundColor DarkGray
 
 }
 
 
 
-Write-Host "==> æ£€æŸ¥/åˆ›å»ºæ•°æ®åº“ $DbName ..." -ForegroundColor Yellow
+Write-Host "==> ¼ì²é/´´½¨Êı¾İ¿â $DbName ..." -ForegroundColor Yellow
 
 $dbOut = (& $Psql -h $PgHost -p $PgPort -U $PgUser -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$DbName'" 2>$null) | Out-String
 
@@ -138,17 +138,17 @@ if (-not $dbExists) {
 
     & $Psql -h $PgHost -p $PgPort -U $PgUser -d postgres -c "CREATE DATABASE $DbName OWNER $AppUser"
 
-    Write-Host "   å·²åˆ›å»ºæ•°æ®åº“ $DbName" -ForegroundColor Green
+    Write-Host "   ÒÑ´´½¨Êı¾İ¿â $DbName" -ForegroundColor Green
 
 } else {
 
-    Write-Host "   æ•°æ®åº“å·²å­˜åœ¨ï¼Œè·³è¿‡" -ForegroundColor DarkGray
+    Write-Host "   Êı¾İ¿âÒÑ´æÔÚ£¬Ìø¹ı" -ForegroundColor DarkGray
 
 }
 
 
 
-# 2. å†™åç«¯ .env çš„ DATABASE_URLï¼ˆè‹¥å·²å­˜åœ¨åˆ™æ›¿æ¢/è¡¥å…¨ï¼‰
+# 2. Ğ´ºó¶Ë .env µÄ DATABASE_URL£¨ÈôÒÑ´æÔÚÔòÌæ»»/²¹È«£©
 
 $envFile = Join-Path $BackendDir ".env"
 
@@ -180,15 +180,15 @@ if (Test-Path $envFile) {
 
     Set-Content -Path $envFile -Value $content -Encoding UTF8
 
-    Write-Host "==> å·²æ›´æ–° $envFile çš„ DATABASE_URL" -ForegroundColor Green
+    Write-Host "==> ÒÑ¸üĞÂ $envFile µÄ DATABASE_URL" -ForegroundColor Green
 
 }
 
 
 
-# 3. Alembic è¿ç§»å»ºè¡¨
+# 3. Alembic Ç¨ÒÆ½¨±í
 
-Write-Host "==> æ‰§è¡Œ Alembic è¿ç§»ï¼ˆå»ºè¡¨ï¼‰..." -ForegroundColor Yellow
+Write-Host "==> Ö´ĞĞ Alembic Ç¨ÒÆ£¨½¨±í£©..." -ForegroundColor Yellow
 
 Push-Location $BackendDir
 
@@ -212,15 +212,15 @@ try {
 
     }
 
-    if ($LASTEXITCODE -ne 0) { throw "Alembic è¿ç§»å¤±è´¥" }
+    if ($LASTEXITCODE -ne 0) { throw "Alembic Ç¨ÒÆÊ§°Ü" }
 
-    Write-Host "   è¿ç§»å®Œæˆ" -ForegroundColor Green
+    Write-Host "   Ç¨ÒÆÍê³É" -ForegroundColor Green
 
 
 
-    # 4. ç§å­æ•°æ®ï¼ˆæŠŠ psql ç›®å½•åŠ å…¥ PATHï¼Œè®© seed ä¼˜å…ˆç”¨åŸç”Ÿ psql æ‰§è¡Œï¼‰
+    # 4. ÖÖ×ÓÊı¾İ£¨°Ñ psql Ä¿Â¼¼ÓÈë PATH£¬ÈÃ seed ÓÅÏÈÓÃÔ­Éú psql Ö´ĞĞ£©
 
-    Write-Host "==> å†™å…¥ç§å­æ•°æ®ï¼ˆå†…ç½®TRæ¨¡æ¿/ç®¡ç†å‘˜/é…ç½®ï¼‰..." -ForegroundColor Yellow
+    Write-Host "==> Ğ´ÈëÖÖ×ÓÊı¾İ£¨ÄÚÖÃTRÄ£°å/¹ÜÀíÔ±/ÅäÖÃ£©..." -ForegroundColor Yellow
 
     $psqlDir = Split-Path $Psql
 
@@ -244,9 +244,9 @@ try {
 
     }
 
-    if ($LASTEXITCODE -ne 0) { throw "ç§å­æ•°æ®å†™å…¥å¤±è´¥" }
+    if ($LASTEXITCODE -ne 0) { throw "ÖÖ×ÓÊı¾İĞ´ÈëÊ§°Ü" }
 
-    Write-Host "   ç§å­æ•°æ®å®Œæˆ" -ForegroundColor Green
+    Write-Host "   ÖÖ×ÓÊı¾İÍê³É" -ForegroundColor Green
 
 } finally {
 
@@ -260,11 +260,11 @@ Write-Host ""
 
 Write-Host "==========================================" -ForegroundColor Green
 
-Write-Host "âœ… æ•°æ®åº“åˆå§‹åŒ–å®Œæˆï¼š$DbName"
+Write-Host "[OK] Êı¾İ¿â³õÊ¼»¯Íê³É£º$DbName"
 
-Write-Host "   åº”ç”¨ç”¨æˆ·: $AppUser / $AppPassword"
+Write-Host "   Ó¦ÓÃÓÃ»§: $AppUser / $AppPassword"
 
-Write-Host "   åˆå§‹ç®¡ç†å‘˜: admin / admin123ï¼ˆè¯·ç™»å½•åç«‹å³ä¿®æ”¹ï¼‰"
+Write-Host "   ³õÊ¼¹ÜÀíÔ±: admin / admin123£¨ÇëµÇÂ¼ºóÁ¢¼´ĞŞ¸Ä£©"
 
 Write-Host "==========================================" -ForegroundColor Green
 
