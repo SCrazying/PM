@@ -103,12 +103,21 @@ class ProjectService:
         return list(rows)
 
     def create_project(self, body: ProjectCreate, operator_id: int) -> Project:
-        # code 唯一（软删兼容由 DB 部分唯一索引兜底，这里先查）
-        exists = self.db.execute(
-            select(Project).where(Project.code == body.code, Project.is_deleted.is_(False))
+        # 项目名称唯一（软删兼容，DB 部分唯一索引 ux_project_name 兜底）
+        name_exists = self.db.execute(
+            select(Project).where(Project.name == body.name, Project.is_deleted.is_(False))
         ).scalar_one_or_none()
-        if exists:
-            raise BizException("项目编号已存在", code=409, http_status=409)
+        if name_exists:
+            raise BizException("项目名称已存在", code=409, http_status=409)
+
+        code = (body.code or "").strip()
+        # code 唯一（软删兼容由 DB 部分唯一索引兜底，这里先查；留空则插入后自动生成）
+        if code:
+            exists = self.db.execute(
+                select(Project).where(Project.code == code, Project.is_deleted.is_(False))
+            ).scalar_one_or_none()
+            if exists:
+                raise BizException("项目编号已存在", code=409, http_status=409)
 
         owner = self.db.get(User, body.owner_id)
         if not owner:
@@ -119,13 +128,15 @@ class ProjectService:
             raise BizException("项目状态不合法", code=400, http_status=400)
 
         project = Project(
-            name=body.name, code=body.code, machine_model=body.machine_model,
+            name=body.name, code=code, machine_model=body.machine_model,
             owner_id=body.owner_id, status=status,
             start_date=body.start_date, end_date=body.end_date,
             description=body.description, created_by=operator_id,
         )
         self.db.add(project)
         self.db.flush()
+        if not project.code:
+            project.code = f"P{project.id}"
 
         # 成员：负责人强制入成员表 + 其它成员
         self._upsert_member(project.id, body.owner_id, "负责人", True)
@@ -221,15 +232,28 @@ class ProjectService:
             if not new_owner:
                 raise NotFoundError("新负责人不存在")
             self._upsert_member(project.id, data["owner_id"], "负责人", True)
-        # 项目编号变更：唯一性校验（软删兼容）
-        if "code" in data and data["code"] != project.code:
-            exists = self.db.execute(
+        # 项目名称变更：唯一性校验（软删兼容）
+        if "name" in data:
+            name_exists = self.db.execute(
                 select(Project).where(
-                    Project.code == data["code"], Project.is_deleted.is_(False), Project.id != project_id
+                    Project.name == data["name"], Project.is_deleted.is_(False), Project.id != project_id
                 )
             ).scalar_one_or_none()
-            if exists:
-                raise BizException("项目编号已存在", code=409, http_status=409)
+            if name_exists:
+                raise BizException("项目名称已存在", code=409, http_status=409)
+        # 项目编号变更：唯一性校验（软删兼容）；留空则自动生成
+        if "code" in data:
+            data["code"] = (data["code"] or "").strip()
+            if not data["code"]:
+                data["code"] = f"P{project.id}"
+            elif data["code"] != project.code:
+                exists = self.db.execute(
+                    select(Project).where(
+                        Project.code == data["code"], Project.is_deleted.is_(False), Project.id != project_id
+                    )
+                ).scalar_one_or_none()
+                if exists:
+                    raise BizException("项目编号已存在", code=409, http_status=409)
         # 项目状态手动配置：白名单校验；置归档时补记 archived_at
         if "status" in data:
             if data["status"] not in PROJECT_STATUSES:

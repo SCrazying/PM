@@ -106,11 +106,13 @@
         <el-table-column label="型号" width="120">
           <template #default="{ row }">{{ row.project.machine_model || '—' }}</template>
         </el-table-column>
-        <el-table-column label="项目" min-width="180">
+        <el-table-column label="项目名称" min-width="180">
           <template #default="{ row }">
-            <div class="project-name" @click="goDetail(row.project)">{{ row.project.name }}</div>
-            <div class="pm-sub">{{ row.project.code }}</div>
+            <span class="project-name" @click="goDetail(row.project)">{{ row.project.name }}</span>
           </template>
+        </el-table-column>
+        <el-table-column label="项目描述" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.project.description || '—' }}</template>
         </el-table-column>
         <el-table-column label="状态" width="104">
           <template #default="{ row }">

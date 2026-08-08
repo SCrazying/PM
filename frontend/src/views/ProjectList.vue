@@ -13,11 +13,13 @@
     </div>
 
     <el-table :data="rows" v-loading="loading" border stripe>
-      <el-table-column prop="code" label="编号" width="96" />
-      <el-table-column prop="name" label="项目名称" min-width="220">
+      <el-table-column prop="name" label="项目名称" min-width="200">
         <template #default="{ row }">
           <el-link type="primary" @click="goDetail(row)">{{ row.name }}</el-link>
         </template>
+      </el-table-column>
+      <el-table-column label="项目描述" min-width="220" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.description || '—' }}</template>
       </el-table-column>
       <el-table-column prop="machine_model" label="机型" width="96" />
       <el-table-column label="当前节点" width="150">

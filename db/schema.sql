@@ -78,7 +78,8 @@ CREATE TABLE project (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     archived_at     TIMESTAMPTZ
 );
-CREATE UNIQUE INDEX ux_project_code ON project(code) WHERE NOT is_deleted;
+CREATE UNIQUE INDEX ux_project_code  ON project(code)  WHERE NOT is_deleted;
+CREATE UNIQUE INDEX ux_project_name  ON project(name)  WHERE NOT is_deleted;
 CREATE INDEX ix_project_status  ON project(status)       WHERE NOT is_deleted;
 CREATE INDEX ix_project_owner   ON project(owner_id)     WHERE NOT is_deleted;
 CREATE INDEX ix_project_machine ON project(machine_model) WHERE NOT is_deleted;

@@ -179,7 +179,8 @@ class ReportService:
         return {
             "project": {"id": project.id, "name": project.name, "code": project.code,
                         "machine_model": project.machine_model, "health": project.health,
-                        "status": project.status, "current_node": current_node,
+                        "status": project.status, "description": project.description,
+                        "current_node": current_node,
                         "nodes": nodes, "project_roles": role_text},
             "week_start": ws, "week_end": we,
             "weekly_goal": goal_row.goal if goal_row else None,

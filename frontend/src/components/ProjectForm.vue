@@ -2,12 +2,12 @@
   <el-dialog v-model="visible" :title="isEdit ? '编辑项目' : '新建项目'" width="760px" :close-on-click-modal="false">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
       <el-form-item label="项目名称" prop="name">
-        <el-input v-model="form.name" placeholder="如：X 机型控制器" />
+        <el-input v-model="form.name" placeholder="项目名称（唯一），如：X 机型控制器" />
       </el-form-item>
       <el-row :gutter="12">
         <el-col :span="12">
-          <el-form-item label="项目编号" prop="code">
-            <el-input v-model="form.code" placeholder="如：P2026001" />
+          <el-form-item label="项目编号（可选）" prop="code">
+            <el-input v-model="form.code" placeholder="留空自动生成" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
@@ -171,7 +171,6 @@ const form = reactive({
 
 const rules = {
   name: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
-  code: [{ required: true, message: '请输入项目编号', trigger: 'blur' }],
   owner_id: [{ required: true, message: '请选择负责人', trigger: 'change' }],
 }
 

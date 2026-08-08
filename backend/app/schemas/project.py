@@ -42,7 +42,7 @@ RoleAssignments = Dict[str, List[int]]
 # ---------- 项目 ----------
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=128)
-    code: str = Field(min_length=1, max_length=64)
+    code: str = Field(default="", max_length=64)   # 项目编号（可选，留空自动生成）
     machine_model: Optional[str] = None
     owner_id: int
     start_date: Optional[date] = None
