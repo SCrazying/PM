@@ -366,7 +366,8 @@ async function loadAll() {
   loading.value = true
   try {
     project.value = await getProject(pid)
-    nodes.value = project.value.nodes || []
+    // 展示仅用启用节点（详情返回全部含停用，供编辑弹窗勾选恢复）
+    nodes.value = (project.value.nodes || []).filter((n) => !n.is_deleted)
     members.value = await listMembers(pid)
     if (!users.value.length) users.value = await listUserOptions()
     if (!currentNode.value && nodes.value.length) {

@@ -189,10 +189,10 @@ class ProjectService:
             setattr(project, f, v)
         if role_assignments is not None:
             self.replace_role_assignments(project.id, role_assignments)
-        if node_deadlines is not None:
-            self.replace_node_deadlines(project.id, node_deadlines)
         if node_enabled_ids is not None:
             self.apply_node_enabled(project, node_enabled_ids)
+        if node_deadlines is not None:
+            self.replace_node_deadlines(project.id, node_deadlines)
         self.db.commit()
         self.db.refresh(project)
         return project

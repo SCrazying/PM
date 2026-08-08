@@ -201,10 +201,13 @@ function nodePlanPayload() {
 }
 
 function nodeDeadlinePayload() {
-  return editableProjectNodes.value.map((n) => ({
-    project_node_id: n.id,
-    planned_end: form.node_deadlines[n.id] || null,
-  }))
+  // 仅提交启用节点（勾选的）的截止时间，避免停用节点报"节点不属于当前项目"
+  return editableProjectNodes.value
+    .filter((n) => form.node_ids.includes(n.id))
+    .map((n) => ({
+      project_node_id: n.id,
+      planned_end: form.node_deadlines[n.id] || null,
+    }))
 }
 
 function validateNodePlans() {
