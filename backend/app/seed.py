@@ -18,8 +18,11 @@ def run() -> int:
         return 0
     # 用 psql 执行 seed.sql（DATABASE_URL 转为 psql 连接串）
     url = settings.DATABASE_URL.replace("postgresql+psycopg2://", "postgresql://")
+    # 强制 psql 客户端编码 UTF8（seed.sql 为 UTF-8；Windows 中文系统默认 GBK 会解码失败）
+    env = dict(os.environ)
+    env["PGCLIENTENCODING"] = "UTF8"
     try:
-        subprocess.run(["psql", url, "-f", SEED_FILE, "-v", "ON_ERROR_STOP=0"], check=True)
+        subprocess.run(["psql", url, "-f", SEED_FILE, "-v", "ON_ERROR_STOP=0"], check=True, env=env)
         logger.info("种子数据执行完成")
         return 0
     except FileNotFoundError:
