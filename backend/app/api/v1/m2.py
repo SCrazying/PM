@@ -151,6 +151,12 @@ def board(granularity: str = "month", year: int | None = None, month: int | None
     return ok(BoardService(db).board(granularity, year, month, machine_model, owner_id))
 
 
+@router.get("/board/summary")
+def board_summary(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """可视化看板统计：状态分布 / 风险 / 待关注项目 / 我的待办。"""
+    return ok(BoardService(db).summary(user))
+
+
 # ---------- 节点流转 ----------
 @router.post("/nodes/{node_id}/transition")
 def node_transition(node_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):

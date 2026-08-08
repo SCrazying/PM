@@ -24,11 +24,13 @@ def list_projects(
     keyword: str | None = None,
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    sort_field: str = Query("id"),
+    sort_order: str = Query("desc"),
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     svc = ProjectService(db)
-    items, total = svc.list_projects(status, owner_id, machine_model, keyword, page, size)
+    items, total = svc.list_projects(status, owner_id, machine_model, keyword, page, size, sort_field, sort_order)
     return page_result([ProjectOut.model_validate(p).model_dump() for p in items], total, page, size)
 
 

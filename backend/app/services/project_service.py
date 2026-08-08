@@ -37,6 +37,9 @@ from app.schemas.project import MemberIn, ProjectCreate, ProjectUpdate, TaskCrea
 
 
 class ProjectService:
+    # 项目列表可排序字段白名单
+    _SORTABLE_FIELDS = frozenset({"id", "name", "code", "machine_model", "status", "created_at", "updated_at"})
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -74,7 +77,8 @@ class ProjectService:
             raise ForbiddenError("仅项目成员可操作")
 
     # ---------- 项目 ----------
-    def list_projects(self, status=None, owner_id=None, machine_model=None, keyword=None, page=1, size=20):
+    def list_projects(self, status=None, owner_id=None, machine_model=None, keyword=None, page=1, size=20,
+                      sort_field="id", sort_order="desc"):
         q = select(Project).where(Project.is_deleted.is_(False))
         if status:
             q = q.where(Project.status == status)
@@ -85,7 +89,12 @@ class ProjectService:
         if keyword:
             q = q.where(Project.name.contains(keyword) | Project.code.contains(keyword))
         total = self.db.execute(select(func.count()).select_from(q.subquery())).scalar_one()
-        q = q.order_by(Project.id.desc()).offset((page - 1) * size).limit(size)
+        # 排序字段白名单，防注入
+        if sort_field not in self._SORTABLE_FIELDS:
+            sort_field = "id"
+        col = getattr(Project, sort_field)
+        q = q.order_by(col.asc() if sort_order == "asc" else col.desc())
+        q = q.offset((page - 1) * size).limit(size)
         return list(self.db.execute(q).scalars().all()), total
 
     def list_machine_options(self) -> list[str]:

@@ -64,6 +64,7 @@ export const projectWeekly = (projectId, week_start) => request.get(`/reports/pr
 export const groupWeekly = (view, week_start) => request.get('/reports/group/weekly', { params: { view, week_start } })
 export const exportLedger = (week_start, type = 'weekly') => request.get('/reports/group/ledger/export', { params: { week_start, type }, responseType: 'blob' })
 export const getBoard = (params) => request.get('/board', { params })
+export const getBoardSummary = () => request.get('/board/summary')
 
 // 通知
 export const listNotifications = (params) => request.get('/notifications', { params })

@@ -103,18 +103,18 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="机型" width="120">
+        <el-table-column label="机型" width="120" sortable :sort-by="(row) => row.project?.machine_model || ''">
           <template #default="{ row }">{{ row.project.machine_model || '—' }}</template>
         </el-table-column>
-        <el-table-column label="项目名称" min-width="180">
+        <el-table-column label="项目名称" min-width="180" sortable :sort-by="(row) => row.project?.name || ''">
           <template #default="{ row }">
             <span class="project-name" @click="goDetail(row.project)">{{ row.project.name }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="项目描述" min-width="200" show-overflow-tooltip>
+        <el-table-column label="项目描述" min-width="200" sortable :sort-by="(row) => row.project?.description || ''" show-overflow-tooltip>
           <template #default="{ row }">{{ row.project.description || '—' }}</template>
         </el-table-column>
-        <el-table-column label="状态" width="104">
+        <el-table-column label="状态" width="104" sortable :sort-by="(row) => row.project?.status || ''">
           <template #default="{ row }">
             <span class="status-chip" :class="'st-' + row.project.status">{{ statusMap[row.project.status] || row.project.status }}</span>
           </template>

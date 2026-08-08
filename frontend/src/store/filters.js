@@ -4,7 +4,7 @@ import { defineStore } from 'pinia'
 export const useViewFilterStore = defineStore('viewFilters', {
   state: () => ({
     board: { machine_model: '', granularity: 'month' },
-    projectList: { keyword: '', status: '', machine_model: '', page: 1, size: 10 },
+    projectList: { keyword: '', status: '', machine_model: '', page: 1, size: 10, sort_field: 'id', sort_order: 'desc' },
     weekly: { weekStart: new Date().toISOString().slice(0, 10), filterMachine: '', view: 'project', filterPerson: '', filterRole: '', filterStatus: 'in_progress' },
   }),
 })

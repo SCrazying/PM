@@ -12,20 +12,20 @@
       <el-button type="success" style="margin-left: auto" @click="openCreate">新建项目</el-button>
     </div>
 
-    <el-table :data="rows" v-loading="loading" border stripe>
-      <el-table-column prop="name" label="项目名称" min-width="200">
+    <el-table :data="rows" v-loading="loading" border stripe @sort-change="onSortChange">
+      <el-table-column prop="name" label="项目名称" min-width="200" sortable="custom">
         <template #default="{ row }">
           <el-link type="primary" @click="goDetail(row)">{{ row.name }}</el-link>
         </template>
       </el-table-column>
-      <el-table-column label="项目描述" min-width="220" show-overflow-tooltip>
+      <el-table-column prop="description" label="项目描述" min-width="220" sortable="custom" show-overflow-tooltip>
         <template #default="{ row }">{{ row.description || '—' }}</template>
       </el-table-column>
-      <el-table-column prop="machine_model" label="机型" width="96" />
+      <el-table-column prop="machine_model" label="机型" width="96" sortable="custom" />
       <el-table-column label="当前节点" width="150">
         <template #default="{ row }">{{ nodeCache[row.id] || '—' }}</template>
       </el-table-column>
-      <el-table-column label="状态" width="132">
+      <el-table-column prop="status" label="状态" width="132" sortable="custom">
         <template #default="{ row }">
           <el-dropdown v-if="canEditStatus(row)" trigger="click" @command="(v) => onStatusChange(row, v)">
             <span class="status-chip" :class="'st-' + row.status">
@@ -118,6 +118,14 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+// 服务端排序：表头点击 → 传 sort_field/sort_order 重新查询
+function onSortChange({ prop, order }) {
+  query.sort_field = order ? (prop || 'id') : 'id'
+  query.sort_order = order === 'ascending' ? 'asc' : 'desc'
+  query.page = 1
+  load()
 }
 
 async function fetchCurrentNode(p) {

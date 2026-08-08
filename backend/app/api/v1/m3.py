@@ -1,6 +1,10 @@
 """M3 路由：个人汇总/AI 总结、附件、配置、TR 模板管理、备份、导出。"""
+import glob
+import json
 import os
+import shutil
 import subprocess
+import sys
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, UploadFile, File, Form
@@ -237,19 +241,84 @@ def import_confirm(body: dict, user: dict = Depends(get_current_user), db: Sessi
 
 
 # ---------- 备份 ----------
+def _find_pg_dump() -> str | None:
+    """查找 pg_dump：先 PATH，再常见 Windows PostgreSQL 安装目录。"""
+    found = shutil.which("pg_dump")
+    if found:
+        return found
+    if sys.platform == "win32":
+        for pat in (r"C:\Program Files\PostgreSQL\*\bin\pg_dump.exe",
+                    r"C:\Program Files (x86)\PostgreSQL\*\bin\pg_dump.exe"):
+            hits = glob.glob(pat)
+            if hits:
+                return hits[0]
+    return None
+
+
+def _sql_literal(value, column, dialect) -> str:
+    """把 Python 值转成 SQL 字面量（配合兜底备份导出）。"""
+    if value is None:
+        return "NULL"
+    if isinstance(value, (dict, list)):
+        return "'" + json.dumps(value, ensure_ascii=False, default=str).replace("'", "''") + "'"
+    proc = column.type.literal_processor(dialect)
+    if proc is not None:
+        try:
+            return proc(value)
+        except Exception:
+            pass
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _sqlalchemy_dump(db: Session, outfile: str) -> None:
+    """无 pg_dump 时的兜底备份：按 ORM 元数据导出全库 schema + 数据 + 序列为 SQL。
+    恢复方式：psql -f 该文件（需在空库上执行，INSERT 前请先建好同名表）。"""
+    import sqlalchemy as sa
+    from app.models.base import Base
+    dialect = db.get_bind().dialect
+    lines = ["-- PM-System SQLAlchemy 兜底备份（无 pg_dump）", "SET session_replication_role = replica;", ""]
+    for table in Base.metadata.sorted_tables:
+        lines.append(str(sa.schema.CreateTable(table).compile(dialect=dialect)) + ";")
+        rows = db.execute(table.select()).mappings().all()
+        if rows:
+            collist = ", ".join(table.columns.keys())
+            for row in rows:
+                vals = [_sql_literal(row[c], table.columns[c], dialect) for c in table.columns.keys()]
+                lines.append(f"INSERT INTO {table.name} ({collist}) VALUES ({', '.join(vals)});")
+        pk = table.primary_key.columns.keys()
+        if pk and len(pk) == 1:
+            lines.append(f"SELECT setval(pg_get_serial_sequence('{table.name}', '{pk[0]}'), "
+                         f"COALESCE((SELECT MAX({pk[0]}) FROM {table.name}), 1));")
+        lines.append("")
+    lines.append("SET session_replication_role = DEFAULT;")
+    with open(outfile, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+
 @router.post("/backup")
 def trigger_backup(user: dict = Depends(require_admin), db: Session = Depends(get_db)):
     os.makedirs(settings.BACKUP_DIR, exist_ok=True)
     from datetime import datetime
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    outfile = os.path.join(settings.BACKUP_DIR, f"db_{ts}.sql")
     url = settings.DATABASE_URL.replace("postgresql+psycopg2://", "postgresql://")
-    try:
-        subprocess.run(["pg_dump", url, "-f", outfile], check=True, capture_output=True, timeout=120)
-    except FileNotFoundError:
-        raise BizException("服务器未安装 pg_dump，无法在线备份")
-    except subprocess.CalledProcessError as e:
-        raise BizException(f"备份失败：{e.stderr.decode(errors='ignore')[:200]}")
+    pg_dump = _find_pg_dump()
+    if pg_dump:
+        outfile = os.path.join(settings.BACKUP_DIR, f"db_{ts}.sql")
+        try:
+            subprocess.run([pg_dump, url, "-f", outfile], check=True, capture_output=True, timeout=180)
+        except subprocess.CalledProcessError as e:
+            raise BizException(f"备份失败：{e.stderr.decode(errors='ignore')[:200]}")
+    else:
+        # 无 pg_dump：SQLAlchemy 全库兜底导出
+        outfile = os.path.join(settings.BACKUP_DIR, f"db_{ts}_fallback.sql")
+        try:
+            _sqlalchemy_dump(db, outfile)
+        except Exception as e:
+            raise BizException(f"备份失败：{e}")
     record_audit(db, user["user_id"], "backup", "system", ts)
     return ok({"file": os.path.basename(outfile)}, message="备份完成")
 
