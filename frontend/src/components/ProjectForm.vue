@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" :title="isEdit ? '编辑项目' : '新建项目'" width="640px" :close-on-click-modal="false">
+  <el-dialog v-model="visible" :title="isEdit ? '编辑项目' : '新建项目'" width="760px" :close-on-click-modal="false">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
       <el-form-item label="项目名称" prop="name">
         <el-input v-model="form.name" placeholder="如：X 机型控制器" />
@@ -316,5 +316,5 @@ defineExpose({ open })
 .node-plan-arrow { color: var(--pm-text-3); }
 .role-grid { width: 100%; row-gap: 8px; }
 .role-field { display: flex; align-items: center; gap: 6px; }
-.role-label { width: 68px; color: var(--pm-text-2); font-size: 13px; flex: none; }
+.role-label { width: 90px; color: var(--pm-text-2); font-size: 13px; flex: none; }
 </style>

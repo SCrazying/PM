@@ -13,14 +13,14 @@
     </div>
 
     <el-table :data="rows" v-loading="loading" border stripe>
-      <el-table-column prop="code" label="编号" width="110" />
-      <el-table-column prop="name" label="项目名称" min-width="180">
+      <el-table-column prop="code" label="编号" width="96" />
+      <el-table-column prop="name" label="项目名称" min-width="220">
         <template #default="{ row }">
           <el-link type="primary" @click="goDetail(row)">{{ row.name }}</el-link>
         </template>
       </el-table-column>
-      <el-table-column prop="machine_model" label="机型" width="100" />
-      <el-table-column label="当前节点" width="140">
+      <el-table-column prop="machine_model" label="机型" width="96" />
+      <el-table-column label="当前节点" width="150">
         <template #default="{ row }">{{ nodeCache[row.id] || '—' }}</template>
       </el-table-column>
       <el-table-column label="状态" width="132">

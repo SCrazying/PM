@@ -11,6 +11,12 @@
         <el-select v-model="filterStatus" clearable placeholder="状态筛选" style="width: 130px">
           <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
+        <el-select v-model="filterRole" clearable placeholder="角色（默认 FO/TL）" style="width: 150px">
+          <el-option v-for="r in roleFilterOptions" :key="r.value" :label="r.label" :value="r.value" />
+        </el-select>
+        <el-select v-model="filterPerson" clearable filterable placeholder="按人筛选" style="width: 130px">
+          <el-option v-for="u in memberUsers" :key="u.id" :label="u.display_name" :value="u.id" />
+        </el-select>
       </template>
       <template v-if="view === 'person'">
         <el-select v-model="filterPerson" clearable filterable placeholder="按人筛选" style="width: 130px">
@@ -216,7 +222,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { groupWeekly, projectWeekly, listProjects, exportLedger, setSubnodeStatus, setProgressRiskResolved, setWeeklyGoalItemDone } from '../api'
+import { groupWeekly, projectWeekly, listProjects, listUserOptions, exportLedger, setSubnodeStatus, setProgressRiskResolved, setWeeklyGoalItemDone } from '../api'
 import { ElMessage } from 'element-plus'
 import { useViewFilterStore } from '../store/filters'
 
@@ -238,11 +244,18 @@ const filteredReports = computed(() => {
   let list = projectReports.value
   if (filterMachine.value) list = list.filter((p) => p.project?.machine_model === filterMachine.value)
   if (filterStatus.value) list = list.filter((p) => p.project?.status === filterStatus.value)
+  if (filterRole.value) list = list.filter((p) => roleHasMember(p.project, filterRole.value))
+  if (filterPerson.value) {
+    const name = memberUsers.value.find((u) => u.id === filterPerson.value)?.display_name
+    if (name) list = list.filter((p) => hasPerson(p.project, name))
+  }
   return list
 })
 const personReports = ref([])
 const expandedProjects = ref([])
 const exporting = ref(false)
+// 项目视图按人筛选用的全部用户（/users/options）
+const memberUsers = ref([])
 
 // FO/TL 筛选：按人 + 角色，方便查看某个人投入了哪些项目
 const filterPerson = computed({ get: () => viewFilters.weekly.filterPerson, set: (v) => { viewFilters.weekly.filterPerson = v } })
@@ -258,6 +271,12 @@ const roleFilterOptions = [
 const personUsers = computed(() => personReports.value.map((p) => ({ user_id: p.user_id, display_name: p.display_name })))
 // project_role 可能是 "TL/FO" 或合并串（如 "TL/FO、CodeReview"），按分隔符精确匹配
 const matchRole = (roleStr, role) => (roleStr || '').split(/[、,，;；]/).some((r) => r.trim() === role)
+// 项目视图：项目周报的 project_roles 是"角色: 姓名、姓名"多行文本，按角色/成员过滤项目
+const roleHasMember = (project, role) => (project?.project_roles || '').split('\n').some((line) => {
+  const i = line.indexOf(':')
+  return i > 0 && line.slice(0, i).trim() === role && line.slice(i + 1).trim()
+})
+const hasPerson = (project, name) => Boolean(name && (project?.project_roles || '').includes(name))
 const filteredPersonReports = computed(() => {
   let list = personReports.value
   if (filterPerson.value) list = list.filter((p) => p.user_id === filterPerson.value)
@@ -389,7 +408,10 @@ async function downloadLedger(type = 'weekly') {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  memberUsers.value = await listUserOptions()
+  load()
+})
 </script>
 
 <style scoped>
