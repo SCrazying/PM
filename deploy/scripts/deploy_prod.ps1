@@ -44,7 +44,10 @@ Write-Host "  PM-System 生产一键部署" -ForegroundColor Cyan
 Write-Host "  部署目录: $Root" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
-# ---------- 0. 生成 .env ----------
+# ---------- 0. 创建数据目录（日志/附件/备份；NSSM 服务写日志依赖） ----------
+New-Item -ItemType Directory -Force -Path "$Root\data\logs", "$Root\data\uploads", "$Root\data\backups" | Out-Null
+
+# ---------- 0.1 生成 .env ----------
 $envFile = Join-Path $BackendDir ".env"
 if (-not (Test-Path $envFile)) {
     if (Test-Path (Join-Path $BackendDir ".env.example")) { Copy-Item (Join-Path $BackendDir ".env.example") $envFile }
