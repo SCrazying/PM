@@ -103,6 +103,13 @@ class AuditLog(IdMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class MachineModel(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
+    """机型（管理端维护；新建/编辑项目下拉选择）。"""
+    __tablename__ = "machine_model"
+
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
 class Config(Base):
     __tablename__ = "config"
 

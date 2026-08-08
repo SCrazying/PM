@@ -103,7 +103,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="型号" width="120">
+        <el-table-column label="机型" width="120">
           <template #default="{ row }">{{ row.project.machine_model || '—' }}</template>
         </el-table-column>
         <el-table-column label="项目名称" min-width="180">
@@ -127,11 +127,10 @@
         <el-table-column label="当前节点" min-width="200">
           <template #default="{ row }">
             <div v-if="currentNodeList(row).length" class="cn-list">
-              <div v-for="n in currentNodeList(row)" :key="n.id" class="cn-row" :class="{ current: n.is_current, done: n.status==='passed' }">
-                <el-tag size="small" effect="plain"
-                        :type="n.is_current ? 'primary' : (n.status==='passed' ? 'success' : 'info')">{{ n.node_key }}</el-tag>
-                <el-tag v-if="n.overdue" size="small" type="warning">超期</el-tag>
-                <span class="cn-date">{{ n.planned_end || '' }}</span>
+              <div v-for="n in currentNodeList(row)" :key="n.id" class="cn-row" :class="{ current: n.is_current }">
+                <span class="cn-key">{{ n.node_key }}</span>
+                <span class="cn-date">{{ n.planned_end || '—' }}</span>
+                <span v-if="n.overdue" class="cn-overdue">超期</span>
               </div>
             </div>
             <span v-else class="pm-sub">未设置</span>
@@ -439,8 +438,10 @@ onMounted(async () => {
 .sub-inline-list, .cn-list { display: flex; flex-direction: column; gap: 3px; }
 .cn-row, .sub-inline { display: flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 2px 4px; border-radius: 6px; min-height: 26px; box-sizing: border-box; }
 .cn-row.current { background: var(--pm-primary-light); }
-.cn-row.done .cn-date { color: var(--pm-success); }
+.cn-key { font-weight: 700; flex-shrink: 0; }
+.cn-row.current .cn-key { color: var(--pm-primary); }
 .cn-date { color: var(--pm-text-3); white-space: nowrap; flex-shrink: 0; }
+.cn-overdue { color: var(--pm-danger); font-size: 12px; font-weight: 600; flex-shrink: 0; }
 .goal-cell { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; line-height: 1.5; }
 .goal-items { display: flex; flex-direction: column; gap: 3px; }
 .goal-item { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; min-height: 24px; }

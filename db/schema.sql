@@ -83,6 +83,17 @@ CREATE UNIQUE INDEX ux_project_name  ON project(name)  WHERE NOT is_deleted;
 CREATE INDEX ix_project_status  ON project(status)       WHERE NOT is_deleted;
 CREATE INDEX ix_project_owner   ON project(owner_id)     WHERE NOT is_deleted;
 CREATE INDEX ix_project_machine ON project(machine_model) WHERE NOT is_deleted;
+
+-- 机型管理（管理端维护；新建/编辑项目下拉选择）
+CREATE TABLE machine_model (
+    id              BIGSERIAL PRIMARY KEY,
+    name            VARCHAR(64) NOT NULL,
+    is_deleted      BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at      TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX ux_machine_model_name ON machine_model(name) WHERE NOT is_deleted;
 COMMENT ON TABLE project IS '项目表';
 
 CREATE TABLE project_member (

@@ -4,6 +4,8 @@
     <el-tabs v-model="tab" class="pm-card">
       <!-- 用户管理 -->
       <el-tab-pane label="用户管理" name="users"><UserAdmin /></el-tab-pane>
+      <!-- 机型管理 -->
+      <el-tab-pane label="机型管理" name="machines"><MachineModelAdmin /></el-tab-pane>
       <!-- TR 模板 -->
       <el-tab-pane label="TR 模板" name="templates"><TemplateAdmin /></el-tab-pane>
       <!-- Excel 导入 -->
@@ -21,6 +23,7 @@
 <script setup>
 import { ref } from 'vue'
 import UserAdmin from '../components/admin/UserAdmin.vue'
+import MachineModelAdmin from '../components/admin/MachineModelAdmin.vue'
 import TemplateAdmin from '../components/admin/TemplateAdmin.vue'
 import ConfigAdmin from '../components/admin/ConfigAdmin.vue'
 import BackupAdmin from '../components/admin/BackupAdmin.vue'

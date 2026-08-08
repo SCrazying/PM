@@ -3,6 +3,9 @@ import request from './request'
 // 项目
 export const listProjects = (params) => request.get('/projects', { params })
 export const listMachineOptions = () => request.get('/projects/machine-options')
+export const listMachineModels = () => request.get('/machine-models')
+export const createMachineModel = (name) => request.post('/machine-models', { name })
+export const deleteMachineModel = (id) => request.delete(`/machine-models/${id}`)
 export const createProject = (data) => request.post('/projects', data)
 export const getProject = (id) => request.get(`/projects/${id}`)
 export const updateProject = (id, data) => request.put(`/projects/${id}`, data)

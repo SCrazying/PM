@@ -1,6 +1,6 @@
 <template>
-  <el-dialog v-model="visible" :title="isEdit ? '编辑项目' : '新建项目'" width="760px" :close-on-click-modal="false">
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
+  <el-dialog v-model="visible" :title="isEdit ? '编辑项目' : '新建项目'" width="840px" :close-on-click-modal="false">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
       <el-form-item label="项目名称" prop="name">
         <el-input v-model="form.name" placeholder="项目名称（唯一），如：X 机型控制器" />
       </el-form-item>
@@ -12,7 +12,10 @@
         </el-col>
         <el-col :span="12">
           <el-form-item label="机型">
-            <el-input v-model="form.machine_model" placeholder="如：X100" />
+            <el-select v-model="form.machine_model" filterable allow-create default-first-option clearable
+                       placeholder="选择或输入机型" style="width: 100%">
+              <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
+            </el-select>
           </el-form-item>
         </el-col>
       </el-row>
@@ -110,7 +113,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { createProject, listTemplates, listUserOptions, updateProject } from '../api'
+import { createProject, listMachineOptions, listTemplates, listUserOptions, updateProject } from '../api'
 
 const emit = defineEmits(['saved'])
 
@@ -122,6 +125,7 @@ const formRef = ref()
 const users = ref([])
 const templates = ref([])
 const projectNodes = ref([])
+const machineOptions = ref([])
 const roleOptions = [
   { key: 'SE', label: 'SE', multiple: false },
   { key: 'TPM', label: 'TPM', multiple: false },
@@ -241,6 +245,7 @@ function validateNodePlans() {
 async function open(project) {
   isEdit.value = !!project
   if (!users.value.length) users.value = await listUserOptions()
+  if (!machineOptions.value.length) machineOptions.value = await listMachineOptions()
   if (!project && !templates.value.length) templates.value = await listTemplates()
   visible.value = true
 

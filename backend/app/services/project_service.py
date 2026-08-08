@@ -89,8 +89,12 @@ class ProjectService:
         return list(self.db.execute(q).scalars().all()), total
 
     def list_machine_options(self) -> list[str]:
-        """去重返回全部非空机型（供筛选下拉使用）。"""
-        rows = self.db.execute(
+        """返回全部机型：管理端登记的机型 ∪ 项目表中现存机型（避免历史数据丢失）。"""
+        from app.models.misc import MachineModel
+        managed = self.db.execute(
+            select(MachineModel.name).where(MachineModel.is_deleted.is_(False)).order_by(MachineModel.name)
+        ).scalars().all()
+        used = self.db.execute(
             select(Project.machine_model)
             .where(
                 Project.is_deleted.is_(False),
@@ -100,7 +104,8 @@ class ProjectService:
             .distinct()
             .order_by(Project.machine_model)
         ).scalars().all()
-        return list(rows)
+        seen = set(managed)
+        return list(managed) + [u for u in used if u not in seen]
 
     def create_project(self, body: ProjectCreate, operator_id: int) -> Project:
         # 项目名称唯一（软删兼容，DB 部分唯一索引 ux_project_name 兜底）

@@ -133,6 +133,57 @@ def set_config(key: str, body: dict, user: dict = Depends(require_admin), db: Se
     return ok(message="已保存")
 
 
+# ---------- 机型管理（管理端维护，供新建/编辑项目下拉）----------
+@router.get("/machine-models")
+def list_machine_models(user: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    from app.models.misc import MachineModel
+    managed = db.execute(
+        select(MachineModel).where(MachineModel.is_deleted.is_(False)).order_by(MachineModel.name)
+    ).scalars().all()
+    used = ProjectService(db).list_machine_options()
+    registered = {m.name for m in managed}
+    rows = [{"id": m.id, "name": m.name, "source": "registered"} for m in managed]
+    rows += [{"id": None, "name": u, "source": "used"} for u in used if u not in registered]
+    return ok(rows)
+
+
+@router.post("/machine-models")
+def create_machine_model(body: dict, user: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    from datetime import datetime, timezone
+    from app.models.misc import MachineModel
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise BizException("机型名称不能为空", code=400, http_status=400)
+    old = db.execute(select(MachineModel).where(MachineModel.name == name)).scalar_one_or_none()
+    if old and not old.is_deleted:
+        raise BizException("机型已存在", code=409, http_status=409)
+    if old:
+        old.is_deleted = False
+        old.deleted_at = None
+        m = old
+    else:
+        m = MachineModel(name=name)
+        db.add(m)
+    db.commit()
+    db.refresh(m)
+    record_audit(db, user["user_id"], "create", "machine_model", str(m.id), {"name": name})
+    return ok({"id": m.id, "name": m.name}, message="已添加")
+
+
+@router.delete("/machine-models/{mid}")
+def delete_machine_model(mid: int, user: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    from datetime import datetime, timezone
+    from app.models.misc import MachineModel
+    m = db.get(MachineModel, mid)
+    if not m or m.is_deleted:
+        raise NotFoundError("机型不存在")
+    m.is_deleted = True
+    m.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    record_audit(db, user["user_id"], "delete", "machine_model", str(mid), {"name": m.name})
+    return ok(message="已删除")
+
+
 # ---------- TR 模板管理 ----------
 @router.post("/tr-templates")
 def create_template(body: dict, user: dict = Depends(require_admin), db: Session = Depends(get_db)):
