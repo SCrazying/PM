@@ -14,6 +14,12 @@ param(
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
+# 检查管理员权限（NSSM 注册 Windows 服务需要）
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-Host "[警告] 当前非管理员权限，注册 Windows 服务可能失败。建议：右键 PowerShell → 以管理员身份运行，再执行本脚本。" -ForegroundColor Yellow
+}
+
 $Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)  # deploy\scripts\.. → pm-prod
 $Python = Join-Path $Root "runtime\python\python.exe"
 $BackendDir = Join-Path $Root "backend"
@@ -79,7 +85,18 @@ try {
 
 # ---------- 3. NSSM 注册 Windows 服务 ----------
 Write-Host "[服务] 注册 Windows 服务 $ServiceName ..." -ForegroundColor Yellow
-& $Nssm install $ServiceName $Python 2>$null | Out-Null
+
+# 幂等：若已存在同名服务，先停止并移除
+& $Nssm stop $ServiceName 2>$null | Out-Null
+& $Nssm remove $ServiceName confirm 2>$null | Out-Null
+Start-Sleep -Seconds 1
+
+# 安装服务（python 路径加引号防空格；NSSM 装服务需管理员权限）
+& $Nssm install $ServiceName "`"$Python`""
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[错误] NSSM 安装服务失败。请以【管理员身份】运行 PowerShell 后重试本脚本。" -ForegroundColor Red
+    throw "NSSM 安装服务失败（可能需要管理员权限）"
+}
 & $Nssm set $ServiceName AppDirectory $BackendDir
 & $Nssm set $ServiceName AppParameters "-m uvicorn app.main:app --host 0.0.0.0 --port $Port"
 & $Nssm set $ServiceName DisplayName "PM-System 项目管理系统"
