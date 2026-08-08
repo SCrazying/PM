@@ -7,6 +7,14 @@
       <el-select v-model="filterMachine" clearable filterable placeholder="按机型筛选" style="width: 150px">
         <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
       </el-select>
+      <template v-if="view === 'person'">
+        <el-select v-model="filterPerson" clearable filterable placeholder="按人筛选" style="width: 130px">
+          <el-option v-for="u in personUsers" :key="u.user_id" :label="u.display_name" :value="u.user_id" />
+        </el-select>
+        <el-select v-model="filterRole" clearable placeholder="角色（默认 FO/TL）" style="width: 150px">
+          <el-option v-for="r in roleFilterOptions" :key="r.value" :label="r.label" :value="r.value" />
+        </el-select>
+      </template>
       <div style="flex:1"></div>
       <el-dropdown @command="downloadLedger">
         <el-button type="success" :loading="exporting">
@@ -168,7 +176,7 @@
 
     <!-- 按人视图 -->
     <div v-else v-loading="loading">
-      <el-table :data="personReports" border stripe v-if="personReports.length">
+      <el-table :data="filteredPersonReports" border stripe v-if="filteredPersonReports.length">
         <el-table-column prop="display_name" label="成员" width="110" fixed />
         <el-table-column label="项目（角色/投入/进展数）" min-width="320">
           <template #default="{ row }">
@@ -231,6 +239,30 @@ const filteredReports = computed(() => {
 const personReports = ref([])
 const expandedProjects = ref([])
 const exporting = ref(false)
+
+// FO/TL 筛选：按人 + 角色，方便查看某个人投入了哪些项目
+const filterPerson = computed({ get: () => viewFilters.weekly.filterPerson, set: (v) => { viewFilters.weekly.filterPerson = v } })
+const filterRole = computed({ get: () => viewFilters.weekly.filterRole, set: (v) => { viewFilters.weekly.filterRole = v } })
+const roleFilterOptions = [
+  { value: 'TL/FO', label: 'FO/TL' },
+  { value: 'SE', label: 'SE' },
+  { value: 'TPM', label: 'TPM' },
+  { value: 'CodeReview', label: 'CodeReview' },
+  { value: '负责人', label: '负责人' },
+]
+const personUsers = computed(() => personReports.value.map((p) => ({ user_id: p.user_id, display_name: p.display_name })))
+// project_role 可能是 "TL/FO" 或合并串（如 "TL/FO、CodeReview"），按分隔符精确匹配
+const matchRole = (roleStr, role) => (roleStr || '').split(/[、,，;；]/).some((r) => r.trim() === role)
+const filteredPersonReports = computed(() => {
+  let list = personReports.value
+  if (filterPerson.value) list = list.filter((p) => p.user_id === filterPerson.value)
+  if (filterRole.value) {
+    list = list
+      .map((p) => ({ ...p, projects: p.projects.filter((pj) => matchRole(pj.project_role, filterRole.value)) }))
+      .filter((p) => p.projects.length)
+  }
+  return list
+})
 
 const healthDot = (h) => ({ on_track: 'success', at_risk: 'warning', delayed: 'danger' }[h] || 'info')
 const healthText = (h) => ({ on_track: '正常', at_risk: '风险', delayed: '延期' }[h] || h)
