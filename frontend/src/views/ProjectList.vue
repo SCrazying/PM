@@ -43,11 +43,10 @@
           <span v-else class="status-chip" :class="'st-' + row.status">{{ statusMap[row.status] || row.status }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="goDetail(row)">详情</el-button>
-          <el-button link type="warning" @click="onArchive(row)">{{ row.status === 'archived' ? '恢复' : '归档' }}</el-button>
-          <el-button link type="danger" @click="onDelete(row)">删除</el-button>
+          <el-button v-if="canEditStatus(row)" link type="danger" @click="onDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -65,7 +64,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { archiveProject, deleteProject, getProject, listMachineOptions, listProjects, unarchiveProject, updateProject } from '../api'
+import { deleteProject, getProject, listMachineOptions, listProjects, updateProject } from '../api'
 import ProjectForm from '../components/ProjectForm.vue'
 import { useViewFilterStore } from '../store/filters'
 import { useUserStore } from '../store/user'
@@ -132,16 +131,16 @@ async function fetchCurrentNode(p) {
 function openCreate() { formRef.value.open() }
 function goDetail(row) { router.push({ name: 'project-detail', params: { id: row.id } }) }
 
-async function onArchive(row) {
-  if (row.status === 'archived') { await unarchiveProject(row.id); ElMessage.success('已恢复') }
-  else { await archiveProject(row.id); ElMessage.success('已归档') }
-  load()
-}
-
+// 删除：两次确认弹窗（第二次需输入项目名称）；仅管理员/负责人可见该按钮（后端同样校验）
 async function onDelete(row) {
-  await ElMessageBox.confirm(`确认删除项目「${row.name}」？（软删除，可恢复）`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(`确认删除项目「${row.name}」？删除后进入回收站，可恢复。`, '删除确认', { type: 'warning', confirmButtonText: '删除' })
+  await ElMessageBox.prompt(`删除不可撤销（需到回收站恢复），请输入项目名称「${row.name}」以二次确认。`, '二次确认', {
+    inputPlaceholder: `输入「${row.name}」`,
+    confirmButtonText: '确认删除',
+    inputValidator: (v) => (v === row.name ? true : '输入的项目名称不一致'),
+  })
   await deleteProject(row.id)
-  ElMessage.success('已删除')
+  ElMessage.success('已删除（可在回收站恢复）')
   load()
 }
 
