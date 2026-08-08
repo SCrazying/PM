@@ -4,6 +4,9 @@
       <span class="pm-page-title">周会视图</span>
       <el-date-picker v-model="weekStart" type="week" format="YYYY 第 ww 周" value-format="YYYY-MM-DD"
                       style="width: 180px" @change="load" />
+      <el-select v-model="filterMachine" clearable filterable placeholder="按机型筛选" style="width: 150px">
+        <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
+      </el-select>
       <div style="flex:1"></div>
       <el-dropdown @command="downloadLedger">
         <el-button type="success" :loading="exporting">
@@ -26,7 +29,7 @@
     <!-- Excel 风格项目台账：默认不展开，展开行查看周报详情。 -->
     <div v-if="view === 'project'" v-loading="loading">
       <el-table
-        :data="projectReports"
+        :data="filteredReports"
         row-key="project.id"
         border
         stripe
@@ -123,20 +126,6 @@
             <span v-else class="pm-sub">无</span>
           </template>
         </el-table-column>
-        <el-table-column label="每日进展" min-width="220">
-          <template #default="{ row }">
-            <div v-if="dailyItems(row).length" class="daily-inline">
-              <div v-for="(it, i) in dailyItems(row)" :key="i" class="daily-inline-item">
-                <span class="di-date">{{ it.date }}</span>
-                <span class="di-author">{{ it.author }}</span>
-                <span class="di-work">{{ it.today_work }}</span>
-                <el-tag v-if="it.risk && !it.risk_resolved" size="small" type="warning" effect="plain">风险</el-tag>
-                <el-tag v-else-if="it.risk && it.risk_resolved" size="small" type="success" effect="plain">风险已解决</el-tag>
-              </div>
-            </div>
-            <span v-else class="pm-sub">无</span>
-          </template>
-        </el-table-column>
         <el-table-column label="周目标" min-width="200">
           <template #default="{ row }">
             <div v-if="row.weekly_goal_items && row.weekly_goal_items.length" class="goal-items">
@@ -150,6 +139,20 @@
               </div>
             </div>
             <div v-else class="goal-cell">{{ row.weekly_goal || '（未设周目标）' }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="每日进展" min-width="220">
+          <template #default="{ row }">
+            <div v-if="dailyItems(row).length" class="daily-inline">
+              <div v-for="(it, i) in dailyItems(row)" :key="i" class="daily-inline-item">
+                <span class="di-date">{{ it.date }}</span>
+                <span class="di-author">{{ it.author }}</span>
+                <span class="di-work">{{ it.today_work }}</span>
+                <el-tag v-if="it.risk && !it.risk_resolved" size="small" type="warning" effect="plain">风险</el-tag>
+                <el-tag v-else-if="it.risk && it.risk_resolved" size="small" type="success" effect="plain">风险已解决</el-tag>
+              </div>
+            </div>
+            <span v-else class="pm-sub">无</span>
           </template>
         </el-table-column>
         <el-table-column label="任务概况" width="100" align="center">
@@ -202,7 +205,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { groupWeekly, projectWeekly, listProjects, exportLedger, setSubnodeStatus, setProgressRiskResolved, setWeeklyGoalItemDone } from '../api'
 import { ElMessage } from 'element-plus'
 
@@ -211,6 +214,18 @@ const weekStart = ref(today)
 const view = ref('project')
 const loading = ref(false)
 const projectReports = ref([])
+const filterMachine = ref('')
+const machineOptions = computed(() => {
+  const set = new Set()
+  projectReports.value.forEach((p) => {
+    if (p.project?.machine_model) set.add(p.project.machine_model)
+  })
+  return [...set]
+})
+const filteredReports = computed(() => {
+  if (!filterMachine.value) return projectReports.value
+  return projectReports.value.filter((p) => p.project?.machine_model === filterMachine.value)
+})
 const personReports = ref([])
 const expandedProjects = ref([])
 const exporting = ref(false)
