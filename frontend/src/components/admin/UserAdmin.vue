@@ -20,13 +20,14 @@
           <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">{{ row.status === 'active' ? '启用' : '停用' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="240" fixed="right">
+      <el-table-column label="操作" width="300" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openForm(row)">编辑</el-button>
           <el-button link type="warning" @click="onReset(row)">重置密码</el-button>
           <el-button link :type="row.status === 'active' ? 'info' : 'success'" @click="onToggle(row)">
             {{ row.status === 'active' ? '停用' : '启用' }}
           </el-button>
+          <el-button link type="danger" @click="onDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -55,7 +56,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { createUser, listUsers, resetPassword, setUserStatus, updateUser } from '../../api'
+import { createUser, deleteUser, listUsers, resetPassword, setUserStatus, updateUser } from '../../api'
 
 const loading = ref(false)
 const rows = ref([])
@@ -80,6 +81,14 @@ async function onReset(row) {
 }
 async function onToggle(row) {
   await setUserStatus(row.id, row.status === 'active' ? 'disabled' : 'active'); ElMessage.success('已更新'); load()
+}
+async function onDelete(row) {
+  await ElMessageBox.confirm(
+    `确定删除用户「${row.display_name}」？其项目/任务等关联数据将阻止删除，建议使用「停用」。`,
+    '删除确认',
+    { type: 'warning', confirmButtonText: '删除', confirmButtonClass: 'el-button--danger' },
+  )
+  await deleteUser(row.id); ElMessage.success('已删除'); load()
 }
 onMounted(load)
 </script>

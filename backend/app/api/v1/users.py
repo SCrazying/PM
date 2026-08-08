@@ -49,3 +49,10 @@ def reset_password(user_id: int, body: ResetPasswordRequest, user: dict = Depend
     UserService(db).reset_password(user_id, body.new_password, user["user_id"])
     record_audit(db, user["user_id"], "reset_password", "user", str(user_id))
     return ok(message="密码已重置")
+
+
+@router.delete("/{user_id}")
+def delete_user(user_id: int, user: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    UserService(db).delete_user(user_id, user["user_id"])
+    record_audit(db, user["user_id"], "delete", "user", str(user_id))
+    return ok(message="已删除")
