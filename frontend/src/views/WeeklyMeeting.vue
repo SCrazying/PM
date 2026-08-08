@@ -106,9 +106,9 @@
             <div class="pm-sub">{{ row.project.code }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="96">
+        <el-table-column label="状态" width="104">
           <template #default="{ row }">
-            <el-tag size="small" :type="statusTag(row.project.status)">{{ statusMap[row.project.status] || row.project.status }}</el-tag>
+            <span class="status-chip" :class="'st-' + row.project.status">{{ statusMap[row.project.status] || row.project.status }}</span>
           </template>
         </el-table-column>
         <el-table-column label="项目角色" min-width="180">
@@ -279,7 +279,7 @@ const statusOptions = [
   { value: 'archived', label: '归档' },
 ]
 const statusMap = Object.fromEntries(statusOptions.map((o) => [o.value, o.label]))
-const statusTag = (s) => ({ in_progress: 'primary', delayed: 'danger', completed: 'success', archived: 'info', suspended: 'warning' }[s] || 'info')
+const statusColor = (s) => ({ not_started: '#8a94a6', in_progress: '#4f6ef7', delayed: '#e64545', completed: '#1aad70', suspended: '#e09000', archived: '#7a5ce0' }[s] || '#8a94a6')
 const taskTag = (t) => (t.status === 'done' ? 'success' : t.overdue ? 'danger' : t.status === 'in_progress' ? 'primary' : 'info')
 const taskText = (t) => (t.status === 'done' ? '已完成' : t.overdue ? '逾期' : t.status === 'in_progress' ? '进行中' : '未开始')
 const doneTaskCount = (tasks) => tasks.filter((t) => t.status === 'done').length
@@ -331,13 +331,27 @@ function onExpand(row, expandedRows) {
   expandedProjects.value = opened ? [row.project.id] : []
 }
 
+// 分页拉全量项目（后端 size 上限 100，逐个翻页直至取完）
+async function fetchAllProjects() {
+  const all = []
+  const size = 100
+  let page = 1
+  for (;;) {
+    const data = await listProjects({ page, size })
+    all.push(...data.list)
+    if (!data.list.length || all.length >= data.total) break
+    page += 1
+  }
+  return all
+}
+
 async function load() {
   loading.value = true
   try {
     if (view.value === 'project') {
-      const projects = await listProjects({ size: 200 })
+      const projects = await fetchAllProjects()
       const reports = []
-      for (const p of projects.list) reports.push(await projectWeekly(p.id, weekStart.value))
+      for (const p of projects) reports.push(await projectWeekly(p.id, weekStart.value))
       projectReports.value = reports
       expandedProjects.value = []
     } else {
@@ -381,6 +395,13 @@ onMounted(load)
 <style scoped>
 .project-name { font-weight: 700; cursor: pointer; color: var(--pm-primary); }
 .project-name:hover { text-decoration: underline; }
+.status-chip { display: inline-flex; align-items: center; padding: 1px 10px; border-radius: 10px; font-size: 12px; line-height: 18px; border: 1px solid; }
+.status-chip.st-not_started { background: #eef1f6; color: #5c6b84; border-color: #d8dfe9; }
+.status-chip.st-in_progress { background: #edf1ff; color: #3a63f0; border-color: #c8d5ff; }
+.status-chip.st-delayed { background: #fdeeee; color: #e64545; border-color: #f5bdbd; }
+.status-chip.st-completed { background: #eafaf2; color: #149a66; border-color: #b5ecd4; }
+.status-chip.st-suspended { background: #fff6e8; color: #d98200; border-color: #f7dbb1; }
+.status-chip.st-archived { background: #f3effd; color: #7a5ce0; border-color: #d8cbf6; }
 .role-summary { white-space: pre-line; line-height: 1.45; font-size: 12px; }
 .node-deadline { margin-top: 3px; }
 .report-body { padding: 6px 4px; }

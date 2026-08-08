@@ -18,9 +18,9 @@
       <el-table-column prop="owner_name" label="负责人" width="110">
         <template #default="{ row }">{{ row.owner_name || row.owner_id }}</template>
       </el-table-column>
-      <el-table-column label="状态" width="100">
+      <el-table-column label="状态" width="104">
         <template #default="{ row }">
-          <el-tag :type="statusTag(row.status)" size="small">{{ statusMap[row.status] || row.status }}</el-tag>
+          <span class="status-chip" :class="'st-' + row.status">{{ statusMap[row.status] || row.status }}</span>
         </template>
       </el-table-column>
       <el-table-column label="删除时间" width="170">
@@ -54,8 +54,7 @@ const total = ref(0)
 const selection = ref([])
 const query = ref({ page: 1, size: 10 })
 
-const statusMap = { not_started: '未开始', in_progress: '进行中', suspended: '暂停', completed: '已完成', archived: '已归档' }
-const statusTag = (s) => ({ in_progress: 'primary', completed: 'success', archived: 'info', suspended: 'warning' }[s] || 'info')
+const statusMap = { not_started: '未开始', in_progress: '进行中', delayed: '延期', suspended: '暂停', completed: '已完成', archived: '归档' }
 const fmtTime = (t) => (t ? String(t).replace('T', ' ').slice(0, 19) : '—')
 
 async function load() {
@@ -99,4 +98,11 @@ onMounted(load)
 
 <style scoped>
 .sec-title { font-weight: 700; font-size: 15px; }
+.status-chip { display: inline-flex; align-items: center; padding: 1px 10px; border-radius: 10px; font-size: 12px; line-height: 18px; border: 1px solid; }
+.status-chip.st-not_started { background: #eef1f6; color: #5c6b84; border-color: #d8dfe9; }
+.status-chip.st-in_progress { background: #edf1ff; color: #3a63f0; border-color: #c8d5ff; }
+.status-chip.st-delayed { background: #fdeeee; color: #e64545; border-color: #f5bdbd; }
+.status-chip.st-completed { background: #eafaf2; color: #149a66; border-color: #b5ecd4; }
+.status-chip.st-suspended { background: #fff6e8; color: #d98200; border-color: #f7dbb1; }
+.status-chip.st-archived { background: #f3effd; color: #7a5ce0; border-color: #d8cbf6; }
 </style>
