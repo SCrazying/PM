@@ -52,9 +52,19 @@ $envFile = Join-Path $BackendDir ".env"
 if (-not (Test-Path $envFile)) {
     if (Test-Path (Join-Path $BackendDir ".env.example")) { Copy-Item (Join-Path $BackendDir ".env.example") $envFile }
 }
-if (-not $JwtSecret) {
+# JWT_SECRET：优先复用 .env 已有值，保持稳定（否则每次部署换 secret，已登录用户 token 全部失效 → 登录后立即"已过期"）
+$existingSecret = ""
+if (Test-Path $envFile) {
+    $envContent = Get-Content $envFile -Raw
+    if ($envContent -match "(?m)^JWT_SECRET=(\S+)") { $existingSecret = $matches[1].Trim() }
+}
+if ($JwtSecret) {
+    $secretToUse = $JwtSecret
+} elseif ($existingSecret -and $existingSecret -ne "change-me-in-prod") {
+    $secretToUse = $existingSecret
+} else {
     $bytes = New-Object byte[] 48; (New-Object Security.Cryptography.RNGCryptoServiceProvider).GetBytes($bytes)
-    $JwtSecret = [Convert]::ToBase64String($bytes)
+    $secretToUse = [Convert]::ToBase64String($bytes)
 }
 $content = ""
 if (Test-Path $envFile) { $content = Get-Content $envFile -Raw }
@@ -68,7 +78,7 @@ foreach ($line in ($content -split "`n")) {
 $lines += "APP_ENV=prod"
 $lines += "PM_SERVE_FRONTEND=1"
 $lines += "DATABASE_URL=postgresql+psycopg2://$AppUser`:$AppPassword@127.0.0.1:5432/$DbName"
-$lines += "JWT_SECRET=$JwtSecret"
+$lines += "JWT_SECRET=$secretToUse"
 $lines += "AI_BASE_URL="
 $lines += "AI_API_KEY="
 $lines += "CORS_ORIGINS="
@@ -125,6 +135,10 @@ if ($LASTEXITCODE -ne 0) {
 & $Nssm set $ServiceName AppRotateBytes 10485760
 & $Nssm set $ServiceName AppExit Default Restart
 & $Nssm set $ServiceName AppRestartDelay 5000
+
+# ---------- 3.5 防火墙放行端口（内网同事可访问） ----------
+Write-Host "[防火墙] 放行 TCP $Port ..." -ForegroundColor Yellow
+netsh advfirewall firewall add rule name="PM-System-$Port" dir=in action=allow protocol=TCP localport=$Port 2>$null | Out-Null
 
 # ---------- 4. 启动服务 ----------
 Write-Host "[服务] 启动 $ServiceName ..." -ForegroundColor Yellow
