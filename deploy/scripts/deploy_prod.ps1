@@ -129,6 +129,25 @@ Write-Host "[服务] 启动 $ServiceName ..." -ForegroundColor Yellow
 Start-Sleep -Seconds 6
 $health = try { (Invoke-WebRequest -Uri "http://127.0.0.1:$Port/health" -UseBasicParsing -TimeoutSec 8).StatusCode } catch { 0 }
 
+# 健康检查失败时，读取后端日志帮助定位
+if ($health -ne 200) {
+    $errLog = Join-Path $Root "data\logs\backend.err"
+    $outLog = Join-Path $Root "data\logs\backend.log"
+    Write-Host ""
+    Write-Host "[警告] 服务已注册但健康检查未通过（HTTP $health）" -ForegroundColor Yellow
+    Write-Host "服务状态:" -ForegroundColor Cyan
+    sc.exe query $ServiceName 2>&1 | Select-String "STATE" | ForEach-Object { $_.Line.Trim() }
+    Write-Host ""
+    Write-Host "--- data\logs\backend.err（最后30行）---" -ForegroundColor Cyan
+    if (Test-Path $errLog) { Get-Content $errLog -Tail 30 } else { Write-Host "（无 err 日志）" -ForegroundColor DarkGray }
+    Write-Host "--- data\logs\backend.log（最后20行）---" -ForegroundColor Cyan
+    if (Test-Path $outLog) { Get-Content $outLog -Tail 20 } else { Write-Host "（无 log 日志）" -ForegroundColor DarkGray }
+    Write-Host ""
+    Write-Host "手动验证后端（前台运行看报错）：" -ForegroundColor Yellow
+    Write-Host "  cd `"$BackendDir`"" -ForegroundColor Yellow
+    Write-Host "  `"$Python`" -m uvicorn app.main:app --host 0.0.0.0 --port $Port" -ForegroundColor Yellow
+}
+
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Green
 Write-Host "[OK] 部署完成"
