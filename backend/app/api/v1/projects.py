@@ -110,9 +110,7 @@ def restore_project(project_id: int, user: dict = Depends(get_current_user), db:
     svc = ProjectService(db)
     p = svc.get_project(project_id, include_deleted=True)
     svc.check_owner(p, user)
-    p.is_deleted = False
-    p.deleted_at = None
-    db.commit()
+    svc.restore_projects([project_id])  # 含编号唯一校验与软删级联恢复
     return ok(message="已恢复")
 
 

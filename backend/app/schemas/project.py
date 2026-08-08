@@ -68,6 +68,11 @@ class ProjectUpdate(BaseModel):
     node_enabled_ids: Optional[List[int]] = None   # 启用的节点 id（未列出则停用，列出则启用/恢复）
 
 
+class RecycleBatchIn(BaseModel):
+    """回收站批量操作：恢复 / 彻底删除的项目 id 列表。"""
+    project_ids: List[int]
+
+
 class ProjectOut(BaseModel):
     id: int
     name: str

@@ -11,12 +11,14 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_admin, require_self_or_admin
-from app.core.responses import BizException, NotFoundError, ok
+from app.core.responses import BizException, NotFoundError, ok, page_result
 from app.engines.ai_engine import AiService
 from app.models.misc import Attachment, Config
 from app.models.project import TrTemplate, TrTemplateNode
+from app.schemas.project import RecycleBatchIn
 from app.services.audit_service import record_audit
 from app.services.personal_service import PersonalService
+from app.services.project_service import ProjectService
 
 router = APIRouter()
 
@@ -207,3 +209,25 @@ def list_backups(user: dict = Depends(require_admin)):
         return ok([])
     files = sorted([f for f in os.listdir(settings.BACKUP_DIR) if f.startswith("db_")], reverse=True)
     return ok([{"file": f, "size": os.path.getsize(os.path.join(settings.BACKUP_DIR, f))} for f in files])
+
+
+# ---------- 回收站（假删除项目：恢复 / 彻底删除）----------
+@router.get("/admin/recycle-bin")
+def recycle_bin(page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=100),
+                user: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    items, total = ProjectService(db).list_deleted_projects(page, size)
+    return page_result(items, total, page, size)
+
+
+@router.post("/admin/recycle-bin/restore")
+def recycle_restore(body: RecycleBatchIn, user: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    n = ProjectService(db).restore_projects(body.project_ids)
+    record_audit(db, user["user_id"], "restore", "project", ",".join(map(str, body.project_ids)), {"count": n})
+    return ok(message=f"已恢复 {n} 个项目")
+
+
+@router.post("/admin/recycle-bin/purge")
+def recycle_purge(body: RecycleBatchIn, user: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    n = ProjectService(db).purge_projects(body.project_ids)
+    record_audit(db, user["user_id"], "purge", "project", ",".join(map(str, body.project_ids)), {"count": n})
+    return ok(message=f"已彻底删除 {n} 个项目")

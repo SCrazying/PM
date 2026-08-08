@@ -3,7 +3,7 @@ from datetime import date
 import re
 from typing import List, Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.responses import BizException, ForbiddenError, NotFoundError
@@ -13,7 +13,23 @@ from app.core.project_roles import (
     canonical_project_role,
     empty_role_assignments,
 )
-from app.models.project import Project, ProjectMember, ProjectNode, ProjectRoleAssignment, Task, TrTemplateNode
+from app.models.misc import (
+    Attachment,
+    Notification,
+    Progress,
+    ProgressTaskLink,
+    ProjectWeeklyGoal,
+    WeeklyGoalItem,
+)
+from app.models.project import (
+    NodeReview,
+    Project,
+    ProjectMember,
+    ProjectNode,
+    ProjectRoleAssignment,
+    Task,
+    TrTemplateNode,
+)
 from app.models.user import User
 from app.schemas.project import MemberIn, ProjectCreate, ProjectUpdate, TaskCreate, TaskUpdate
 
@@ -292,6 +308,124 @@ class ProjectService:
                 row.is_deleted = True
                 row.deleted_at = now
         self.db.commit()
+
+    # ---------- 回收站（软删项目列表 / 恢复 / 彻底删除）----------
+    def list_deleted_projects(self, page: int = 1, size: int = 20) -> tuple[list[dict], int]:
+        """回收站列表：软删项目，按删除时间倒序，附带负责人姓名。"""
+        q = select(Project).where(Project.is_deleted.is_(True))
+        total = self.db.execute(select(func.count()).select_from(q.subquery())).scalar_one()
+        rows = self.db.execute(
+            q.order_by(Project.deleted_at.desc(), Project.id.desc())
+            .offset((page - 1) * size).limit(size)
+        ).scalars().all()
+        owner_ids = {r.owner_id for r in rows}
+        names = dict(self.db.execute(
+            select(User.id, User.display_name).where(User.id.in_(owner_ids or [0]))
+        ).all())
+        items = []
+        for r in rows:
+            d = {
+                "id": r.id, "name": r.name, "code": r.code, "machine_model": r.machine_model,
+                "owner_id": r.owner_id, "owner_name": names.get(r.owner_id),
+                "status": r.status, "health": r.health,
+                "start_date": r.start_date, "end_date": r.end_date,
+                "created_at": r.created_at, "deleted_at": r.deleted_at,
+            }
+            items.append(d)
+        return items, total
+
+    def restore_projects(self, project_ids: list[int]) -> int:
+        """回收站恢复：恢复项目及其软删级联的节点/任务/成员。
+
+        数据库兼容：编号唯一由部分唯一索引 ux_project_code（WHERE NOT is_deleted）兜底，
+        这里先整体查重，命中冲突则整体失败返回 409，避免抛 UniqueViolation 导致 500。
+        """
+        ids = list(dict.fromkeys(project_ids or []))
+        if not ids:
+            raise BizException("请选择要恢复的项目")
+        projects = list(self.db.execute(select(Project).where(Project.id.in_(ids))).scalars().all())
+        if len(projects) != len(ids):
+            raise NotFoundError("部分项目不存在")
+        for p in projects:
+            if not p.is_deleted:
+                raise BizException(f"项目「{p.name}」不在回收站中", code=409, http_status=409)
+        conflicts = list(self.db.execute(
+            select(Project).where(
+                Project.code.in_({p.code for p in projects}),
+                Project.is_deleted.is_(False),
+                Project.id.not_in(ids),
+            )
+        ).scalars().all())
+        if conflicts:
+            codes = "、".join(f"「{c.code}」" for c in conflicts)
+            raise BizException(f"项目编号 {codes} 已被其他项目占用，无法恢复", code=409, http_status=409)
+        for p in projects:
+            p.is_deleted = False
+            p.deleted_at = None
+            # 反向级联：恢复删除时一并软删的节点/任务/成员
+            for model, fk in [
+                (ProjectNode, ProjectNode.project_id),
+                (Task, Task.project_id),
+                (ProjectMember, ProjectMember.project_id),
+            ]:
+                for row in self.db.execute(
+                    select(model).where(fk == p.id, model.is_deleted.is_(True))
+                ).scalars().all():
+                    row.is_deleted = False
+                    row.deleted_at = None
+        return len(projects)
+
+    def purge_projects(self, project_ids: list[int]) -> int:
+        """回收站彻底删除：物理删除项目及全部关联数据（不可恢复）。
+
+        数据库兼容：按外键 RESTRICT 约束的依赖顺序删除（先子表后父表），
+        自引用 project_node.parent_id CASCADE 由一次性全删本项目的节点解决；
+        空 in_ 列表用 [0] 兜底，PG 与 SQLite 均可用。
+        """
+        ids = list(dict.fromkeys(project_ids or []))
+        if not ids:
+            raise BizException("请选择要删除的项目")
+        projects = list(self.db.execute(select(Project).where(Project.id.in_(ids))).scalars().all())
+        if len(projects) != len(ids):
+            raise NotFoundError("部分项目不存在")
+        node_ids = list(self.db.execute(
+            select(ProjectNode.id).where(ProjectNode.project_id.in_(ids))
+        ).scalars().all())
+        task_ids = list(self.db.execute(
+            select(Task.id).where(Task.project_id.in_(ids))
+        ).scalars().all())
+        review_ids = list(self.db.execute(
+            select(NodeReview.id).where(NodeReview.project_node_id.in_(node_ids or [0]))
+        ).scalars().all())
+        progress_ids = list(self.db.execute(
+            select(Progress.id).where(Progress.project_id.in_(ids))
+        ).scalars().all())
+
+        # 通知指向项目/节点（无外键约束），一并清理避免残留失效链接
+        self.db.execute(delete(Notification).where(or_(
+            and_(Notification.ref_type == "project", Notification.ref_id.in_(ids)),
+            and_(Notification.ref_type == "node", Notification.ref_id.in_(node_ids or [0])),
+        )))
+        self.db.execute(delete(ProgressTaskLink).where(or_(
+            ProgressTaskLink.progress_id.in_(progress_ids or [0]),
+            ProgressTaskLink.task_id.in_(task_ids or [0]),
+        )))
+        self.db.execute(delete(Attachment).where(or_(
+            Attachment.project_id.in_(ids),
+            Attachment.project_node_id.in_(node_ids or [0]),
+            Attachment.task_id.in_(task_ids or [0]),
+            Attachment.review_id.in_(review_ids or [0]),
+        )))
+        self.db.execute(delete(Progress).where(Progress.project_id.in_(ids)))
+        self.db.execute(delete(Task).where(Task.project_id.in_(ids)))
+        self.db.execute(delete(NodeReview).where(NodeReview.project_node_id.in_(node_ids or [0])))
+        self.db.execute(delete(WeeklyGoalItem).where(WeeklyGoalItem.project_id.in_(ids)))
+        self.db.execute(delete(ProjectWeeklyGoal).where(ProjectWeeklyGoal.project_id.in_(ids)))
+        self.db.execute(delete(ProjectNode).where(ProjectNode.project_id.in_(ids)))
+        self.db.execute(delete(ProjectRoleAssignment).where(ProjectRoleAssignment.project_id.in_(ids)))
+        self.db.execute(delete(ProjectMember).where(ProjectMember.project_id.in_(ids)))
+        self.db.execute(delete(Project).where(Project.id.in_(ids)))
+        return len(projects)
 
     # ---------- 成员 ----------
     def _upsert_member(self, project_id: int, user_id: int, role: Optional[str], invested: bool) -> ProjectMember:

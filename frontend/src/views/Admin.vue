@@ -12,6 +12,8 @@
       <el-tab-pane label="系统配置" name="config"><ConfigAdmin /></el-tab-pane>
       <!-- 备份 -->
       <el-tab-pane label="数据备份" name="backup"><BackupAdmin /></el-tab-pane>
+      <!-- 回收站 -->
+      <el-tab-pane label="回收站" name="recycle"><RecycleBinAdmin /></el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -23,6 +25,7 @@ import TemplateAdmin from '../components/admin/TemplateAdmin.vue'
 import ConfigAdmin from '../components/admin/ConfigAdmin.vue'
 import BackupAdmin from '../components/admin/BackupAdmin.vue'
 import ImportAdmin from '../components/admin/ImportAdmin.vue'
+import RecycleBinAdmin from '../components/admin/RecycleBinAdmin.vue'
 
 const tab = ref('users')
 </script>
