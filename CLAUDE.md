@@ -6,3 +6,4 @@
 - 禁止用 em dash，中文用全角破折号
 - 金额相关计算一律用"分"，禁止浮点数
 - 组件文件用 named export，不用 default export
+- 使用中文对话

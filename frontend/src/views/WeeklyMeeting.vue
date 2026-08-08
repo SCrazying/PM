@@ -207,13 +207,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { groupWeekly, projectWeekly, listProjects, exportLedger, setSubnodeStatus, setProgressRiskResolved, setWeeklyGoalItemDone } from '../api'
 import { ElMessage } from 'element-plus'
+import { useViewFilterStore } from '../store/filters'
 
-const today = new Date().toISOString().slice(0, 10)
-const weekStart = ref(today)
-const view = ref('project')
+const viewFilters = useViewFilterStore()
+const weekStart = computed({ get: () => viewFilters.weekly.weekStart, set: (v) => { viewFilters.weekly.weekStart = v } })
+const view = computed({ get: () => viewFilters.weekly.view, set: (v) => { viewFilters.weekly.view = v } })
 const loading = ref(false)
 const projectReports = ref([])
-const filterMachine = ref('')
+const filterMachine = computed({ get: () => viewFilters.weekly.filterMachine, set: (v) => { viewFilters.weekly.filterMachine = v } })
 const machineOptions = computed(() => {
   const set = new Set()
   projectReports.value.forEach((p) => {

@@ -6,7 +6,7 @@
       <el-select v-model="filters.machine_model" placeholder="机型" clearable filterable style="width: 140px" @change="load">
         <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
       </el-select>
-      <el-select v-model="granularity" style="width: 110px" @change="load">
+      <el-select v-model="filters.granularity" style="width: 110px" @change="load">
         <el-option label="按月" value="month" />
         <el-option label="按年" value="year" />
       </el-select>
@@ -41,15 +41,15 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getBoard, listMachineOptions } from '../api'
+import { useViewFilterStore } from '../store/filters'
 
 const router = useRouter()
 const loading = ref(false)
-const granularity = ref('month')
 const machineOptions = ref([])
-const filters = reactive({ machine_model: '' })
+const filters = useViewFilterStore().board
 const columns = ref([
   { key: 'not_started', title: '未开始', color: '#9099a6', items: [] },
   { key: 'in_progress', title: '进行中', color: '#4f6ef7', items: [] },
@@ -64,7 +64,7 @@ const healthText = (h) => ({ on_track: '正常', at_risk: '风险', delayed: '�
 async function load() {
   loading.value = true
   try {
-    const data = await getBoard({ granularity: granularity.value, machine_model: filters.machine_model || undefined })
+    const data = await getBoard({ granularity: filters.granularity, machine_model: filters.machine_model || undefined })
     const cols = data.columns || {}
     columns.value.forEach((c) => { c.items = cols[c.key] || [] })
   } finally { loading.value = false }

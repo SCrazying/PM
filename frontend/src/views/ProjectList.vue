@@ -52,11 +52,12 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { archiveProject, deleteProject, getProject, listMachineOptions, listProjects, unarchiveProject } from '../api'
 import ProjectForm from '../components/ProjectForm.vue'
+import { useViewFilterStore } from '../store/filters'
 
 const router = useRouter()
 const formRef = ref()
@@ -65,7 +66,7 @@ const rows = ref([])
 const total = ref(0)
 const nodeCache = ref({})
 const machineOptions = ref([])
-const query = reactive({ keyword: '', status: '', machine_model: '', page: 1, size: 10 })
+const query = useViewFilterStore().projectList
 
 const statusMap = { not_started: '未开始', in_progress: '进行中', suspended: '暂停', completed: '已完成', archived: '已归档' }
 const healthMap = { on_track: '正常', at_risk: '风险', delayed: '延期' }

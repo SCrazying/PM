@@ -339,19 +339,28 @@ class ProjectService:
         return normalized
 
     def replace_role_assignments(self, project_id: int, assignments: Optional[dict]) -> dict[str, list[int]]:
-        """以完整角色集合替换项目角色，并确保角色用户属于项目成员。"""
+        """以完整角色集合替换项目角色，并确保角色用户属于项目成员。
+        只增删有变化的分配；不变的保留原行，避免 DELETE+INSERT 同一角色触发唯一键冲突。"""
         normalized = self._normalize_role_assignments(assignments)
         current = self.db.execute(
             select(ProjectRoleAssignment).where(ProjectRoleAssignment.project_id == project_id)
         ).scalars().all()
+        current_keys = {(row.role, row.user_id) for row in current}
+        desired_keys = {
+            (role, user_id)
+            for role, user_ids in normalized.items()
+            for user_id in user_ids
+        }
         for row in current:
-            self.db.delete(row)
+            if (row.role, row.user_id) not in desired_keys:
+                self.db.delete(row)
+        for role, user_id in desired_keys - current_keys:
+            self.db.add(ProjectRoleAssignment(project_id=project_id, role=role, user_id=user_id))
 
         roles_by_user: dict[int, list[str]] = {}
         for role, user_ids in normalized.items():
             for user_id in user_ids:
                 roles_by_user.setdefault(user_id, []).append(role)
-                self.db.add(ProjectRoleAssignment(project_id=project_id, role=role, user_id=user_id))
 
         # 清理旧的兼容字段，避免编辑时清空角色后又被旧字段兜底恢复。
         members = self.db.execute(
