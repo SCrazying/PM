@@ -1,15 +1,15 @@
-# PM-System Éú²úĞ¶ÔØ£¨Windows£©
-# ÓÃ·¨£ºpowershell -ExecutionPolicy Bypass -File uninstall_prod.ps1
+ï»¿# PM-System ç”Ÿäº§å¸è½½ï¼ˆWindowsï¼‰
+# ç”¨æ³•ï¼špowershell -ExecutionPolicy Bypass -File uninstall_prod.ps1
 param(
     [string]$ServiceName = "pm-system",
-    [switch]$KeepData   # ±£ÁôÊı¾İÎÄ¼ş£¨Ä¬ÈÏ²»É¾£»²»¼Ó´Ë¿ª¹ØÔòÌáÊ¾ÊÇ·ñÉ¾³ıÊı¾İ£©
+    [switch]$KeepData   # ä¿ç•™æ•°æ®æ–‡ä»¶ï¼ˆé»˜è®¤ä¸åˆ ï¼›ä¸åŠ æ­¤å¼€å…³åˆ™æç¤ºæ˜¯å¦åˆ é™¤æ•°æ®ï¼‰
 )
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $Nssm = Join-Path $Root "deploy\bin\nssm.exe"
 
-Write-Host "==> Í£Ö¹²¢É¾³ı·şÎñ $ServiceName ..." -ForegroundColor Yellow
+Write-Host "==> åœæ­¢å¹¶åˆ é™¤æœåŠ¡ $ServiceName ..." -ForegroundColor Yellow
 & $Nssm stop $ServiceName 2>$null | Out-Null
 Start-Sleep -Seconds 2
 & $Nssm remove $ServiceName confirm
@@ -17,10 +17,10 @@ Start-Sleep -Seconds 2
 if (-not $KeepData) {
     $dataDir = Join-Path $Root "data"
     if (Test-Path $dataDir) {
-        $ans = Read-Host "ÊÇ·ñÉ¾³ıÊı¾İÄ¿Â¼ $dataDir£¨ÉÏ´«¸½¼ş/±¸·İ/ÈÕÖ¾£©£¿(yes/no)"
-        if ($ans -eq "yes") { Remove-Item -Recurse -Force $dataDir; Write-Host "   ÒÑÉ¾³ı $dataDir" -ForegroundColor Green }
+        $ans = Read-Host "æ˜¯å¦åˆ é™¤æ•°æ®ç›®å½• $dataDirï¼ˆä¸Šä¼ é™„ä»¶/å¤‡ä»½/æ—¥å¿—ï¼‰ï¼Ÿ(yes/no)"
+        if ($ans -eq "yes") { Remove-Item -Recurse -Force $dataDir; Write-Host "   å·²åˆ é™¤ $dataDir" -ForegroundColor Green }
     }
-    Write-Host "ÌáÊ¾£ºÈçĞè³¹µ×ÇåÀíÊı¾İ¿â£¬ÇëÓÃ PostgreSQL ¹ÜÀí¹¤¾ßÉ¾³ı $($Root)" -ForegroundColor DarkGray
+    Write-Host "æç¤ºï¼šå¦‚éœ€å½»åº•æ¸…ç†æ•°æ®åº“ï¼Œè¯·ç”¨ PostgreSQL ç®¡ç†å·¥å…·åˆ é™¤ $($Root)" -ForegroundColor DarkGray
 }
 
-Write-Host "[OK] Ğ¶ÔØÍê³É£º·şÎñ $ServiceName ÒÑÒÆ³ı£¨pm-prod Ä¿Â¼¿ÉÉ¾³ı£©" -ForegroundColor Green
+Write-Host "[OK] å¸è½½å®Œæˆï¼šæœåŠ¡ $ServiceName å·²ç§»é™¤ï¼ˆpm-prod ç›®å½•å¯åˆ é™¤ï¼‰" -ForegroundColor Green
