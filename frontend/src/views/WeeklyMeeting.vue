@@ -132,10 +132,10 @@
               <div v-for="g in row.weekly_goal_items" :key="g.id" class="goal-item" :class="{ done: g.done }"
                    @click="onToggleGoalItem(g)" :title="`${g.goal}（点击切换完成）`">
                 <el-icon :size="13"><Select v-if="g.done" /><CircleCheck v-else /></el-icon>
-                <span class="gi-goal">{{ g.goal }}</span>
                 <span v-if="g.done" class="gi-date">{{ g.done_at }}</span>
                 <span v-else-if="g.overdue" class="gi-date gi-overdue">超期 {{ g.deadline }}</span>
                 <span v-else-if="g.deadline" class="gi-date">{{ g.deadline }}</span>
+                <span class="gi-goal">{{ g.goal }}</span>
               </div>
             </div>
             <div v-else class="goal-cell">{{ row.weekly_goal || '（未设周目标）' }}</div>
@@ -149,7 +149,6 @@
                 <span class="di-author">{{ it.author }}</span>
                 <span class="di-work">{{ it.today_work }}</span>
                 <el-tag v-if="it.risk && !it.risk_resolved" size="small" type="warning" effect="plain">风险</el-tag>
-                <el-tag v-else-if="it.risk && it.risk_resolved" size="small" type="success" effect="plain">风险已解决</el-tag>
               </div>
             </div>
             <span v-else class="pm-sub">无</span>
@@ -239,7 +238,7 @@ const doneTaskCount = (tasks) => tasks.filter((t) => t.status === 'done').length
 // 短日期 MM-DD
 const shortDate = (d) => (d ? String(d).slice(5) : '')
 
-// 每日进展列：把 p.daily 展平成有序列表（日期倒序，取最近 3 天）
+// 每日进展列：把 p.daily 展平成有序列表（日期倒序）；有风险的进展固定排最后一行，且不被截断
 function dailyItems(row) {
   const dates = Object.keys(row.daily || {}).sort().reverse()
   const items = []
@@ -248,7 +247,9 @@ function dailyItems(row) {
       items.push({ date: d.slice(5), author: it.author, today_work: it.today_work, risk: it.risk, risk_resolved: it.risk_resolved })
     }
   }
-  return items.slice(0, 4)
+  const safe = items.filter((it) => !(it.risk && !it.risk_resolved))
+  const risks = items.filter((it) => it.risk && !it.risk_resolved)
+  return [...safe.slice(0, Math.max(0, 4 - risks.length)), ...risks]
 }
 
 async function onToggleRisk(r) {

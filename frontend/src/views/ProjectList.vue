@@ -5,7 +5,9 @@
       <el-select v-model="query.status" placeholder="状态" clearable style="width: 130px">
         <el-option v-for="(v, k) in statusMap" :key="k" :label="v" :value="k" />
       </el-select>
-      <el-input v-model="query.machine_model" placeholder="机型" clearable style="width: 130px" @keyup.enter="load" />
+      <el-select v-model="query.machine_model" placeholder="机型" clearable filterable style="width: 130px" @change="load">
+        <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
+      </el-select>
       <el-button type="primary" @click="load">查询</el-button>
       <el-button type="success" style="margin-left: auto" @click="openCreate">新建项目</el-button>
     </div>
@@ -53,7 +55,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { archiveProject, deleteProject, getProject, listProjects, unarchiveProject } from '../api'
+import { archiveProject, deleteProject, getProject, listMachineOptions, listProjects, unarchiveProject } from '../api'
 import ProjectForm from '../components/ProjectForm.vue'
 
 const router = useRouter()
@@ -62,6 +64,7 @@ const loading = ref(false)
 const rows = ref([])
 const total = ref(0)
 const nodeCache = ref({})
+const machineOptions = ref([])
 const query = reactive({ keyword: '', status: '', machine_model: '', page: 1, size: 10 })
 
 const statusMap = { not_started: '未开始', in_progress: '进行中', suspended: '暂停', completed: '已完成', archived: '已归档' }
@@ -105,7 +108,10 @@ async function onDelete(row) {
   load()
 }
 
-onMounted(load)
+onMounted(async () => {
+  machineOptions.value = await listMachineOptions()
+  load()
+})
 </script>
 
 <style scoped>

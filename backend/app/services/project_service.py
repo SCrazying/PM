@@ -70,6 +70,20 @@ class ProjectService:
         q = q.order_by(Project.id.desc()).offset((page - 1) * size).limit(size)
         return list(self.db.execute(q).scalars().all()), total
 
+    def list_machine_options(self) -> list[str]:
+        """去重返回全部非空机型（供筛选下拉使用）。"""
+        rows = self.db.execute(
+            select(Project.machine_model)
+            .where(
+                Project.is_deleted.is_(False),
+                Project.machine_model.isnot(None),
+                Project.machine_model != "",
+            )
+            .distinct()
+            .order_by(Project.machine_model)
+        ).scalars().all()
+        return list(rows)
+
     def create_project(self, body: ProjectCreate, operator_id: int) -> Project:
         # code 唯一（软删兼容由 DB 部分唯一索引兜底，这里先查）
         exists = self.db.execute(

@@ -32,6 +32,11 @@ def list_projects(
     return page_result([ProjectOut.model_validate(p).model_dump() for p in items], total, page, size)
 
 
+@router.get("/machine-options")
+def list_machine_options(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    return ok(ProjectService(db).list_machine_options())
+
+
 @router.post("")
 def create_project(body: ProjectCreate, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     svc = ProjectService(db)

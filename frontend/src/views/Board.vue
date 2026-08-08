@@ -3,7 +3,9 @@
     <div class="pm-toolbar">
       <span class="pm-page-title">项目看板</span>
       <div style="flex:1"></div>
-      <el-input v-model="filters.machine_model" placeholder="机型" clearable style="width: 140px" @change="load" />
+      <el-select v-model="filters.machine_model" placeholder="机型" clearable filterable style="width: 140px" @change="load">
+        <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
+      </el-select>
       <el-select v-model="granularity" style="width: 110px" @change="load">
         <el-option label="按月" value="month" />
         <el-option label="按年" value="year" />
@@ -41,11 +43,12 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getBoard } from '../api'
+import { getBoard, listMachineOptions } from '../api'
 
 const router = useRouter()
 const loading = ref(false)
 const granularity = ref('month')
+const machineOptions = ref([])
 const filters = reactive({ machine_model: '' })
 const columns = ref([
   { key: 'not_started', title: '未开始', color: '#9099a6', items: [] },
@@ -67,7 +70,10 @@ async function load() {
   } finally { loading.value = false }
 }
 function goDetail(p) { router.push({ name: 'project-detail', params: { id: p.id } }) }
-onMounted(load)
+onMounted(async () => {
+  machineOptions.value = await listMachineOptions()
+  load()
+})
 </script>
 
 <style scoped>
