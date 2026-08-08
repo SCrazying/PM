@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.project_roles import PROJECT_ROLE_NAMES, canonical_project_role
-from app.models.misc import Progress, ProjectWeeklyGoal
+from app.models.misc import Progress, ProjectWeeklyGoal, WeeklyGoalItem
 from app.models.project import Project, ProjectMember, ProjectNode, ProjectRoleAssignment, Task
 from app.models.user import User
 from app.services.progress_service import ProgressService
@@ -165,6 +165,17 @@ class ReportService:
                 if n.id == project.current_node_id:
                     subnodes = node_subnodes[-1]["subnodes"]
 
+        # 周目标条目（本周）
+        goal_items = [{
+            "id": g.id, "goal": g.goal, "deadline": g.deadline,
+            "done": g.done, "done_at": g.done_at,
+            "overdue": bool(not g.done and g.deadline and g.deadline < date.today()),
+        } for g in self.db.execute(
+            select(WeeklyGoalItem).where(
+                WeeklyGoalItem.project_id == project_id, WeeklyGoalItem.week_start == ws,
+            ).order_by(WeeklyGoalItem.sequence, WeeklyGoalItem.id)
+        ).scalars().all()]
+
         return {
             "project": {"id": project.id, "name": project.name, "code": project.code,
                         "machine_model": project.machine_model, "health": project.health,
@@ -172,6 +183,7 @@ class ReportService:
                         "nodes": nodes, "project_roles": role_text},
             "week_start": ws, "week_end": we,
             "weekly_goal": goal_row.goal if goal_row else None,
+            "weekly_goal_items": goal_items,
             "tasks": week_tasks,
             "daily": daily,
             "risks": risks,

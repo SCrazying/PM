@@ -137,9 +137,19 @@
             <span v-else class="pm-sub">无</span>
           </template>
         </el-table-column>
-        <el-table-column label="周目标" min-width="180">
+        <el-table-column label="周目标" min-width="200">
           <template #default="{ row }">
-            <div class="goal-cell">{{ row.weekly_goal || '（未设周目标）' }}</div>
+            <div v-if="row.weekly_goal_items && row.weekly_goal_items.length" class="goal-items">
+              <div v-for="g in row.weekly_goal_items" :key="g.id" class="goal-item" :class="{ done: g.done }"
+                   @click="onToggleGoalItem(g)" :title="`${g.goal}（点击切换完成）`">
+                <el-icon :size="13"><Select v-if="g.done" /><CircleCheck v-else /></el-icon>
+                <span class="gi-goal">{{ g.goal }}</span>
+                <span v-if="g.done" class="gi-date">{{ g.done_at }}</span>
+                <span v-else-if="g.overdue" class="gi-date gi-overdue">超期 {{ g.deadline }}</span>
+                <span v-else-if="g.deadline" class="gi-date">{{ g.deadline }}</span>
+              </div>
+            </div>
+            <div v-else class="goal-cell">{{ row.weekly_goal || '（未设周目标）' }}</div>
           </template>
         </el-table-column>
         <el-table-column label="任务概况" width="100" align="center">
@@ -193,7 +203,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { groupWeekly, projectWeekly, listProjects, exportLedger, setSubnodeStatus, setProgressRiskResolved } from '../api'
+import { groupWeekly, projectWeekly, listProjects, exportLedger, setSubnodeStatus, setProgressRiskResolved, setWeeklyGoalItemDone } from '../api'
 import { ElMessage } from 'element-plus'
 
 const today = new Date().toISOString().slice(0, 10)
@@ -232,6 +242,14 @@ async function onToggleRisk(r) {
   ElMessage.success(target ? '已关闭风险' : '已重新打开风险')
   if (updated) {
     r.resolved = updated.resolved
+  }
+}
+
+async function onToggleGoalItem(g) {
+  const updated = await setWeeklyGoalItemDone(g.id, !g.done)
+  ElMessage.success(g.done ? `「${g.goal}」已取消完成` : `「${g.goal}」已完成`)
+  if (updated) {
+    Object.assign(g, { done: updated.done, done_at: updated.done_at })
   }
 }
 
@@ -306,6 +324,16 @@ onMounted(load)
 .cn-row.done .cn-date { color: var(--pm-success); }
 .cn-date { color: var(--pm-text-3); white-space: nowrap; flex-shrink: 0; }
 .goal-cell { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; line-height: 1.5; }
+.goal-items { display: flex; flex-direction: column; gap: 3px; }
+.goal-item { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; min-height: 24px; }
+.goal-item:hover { background: var(--pm-primary-light); }
+.goal-item.done { background: #e9f9f0; }
+.goal-item.done .gi-goal { color: var(--pm-success); text-decoration: line-through; }
+.goal-item .el-icon { color: var(--pm-primary); flex-shrink: 0; }
+.goal-item.done .el-icon { color: var(--pm-success); }
+.gi-goal { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
+.gi-date { color: var(--pm-text-3); font-size: 11.5px; white-space: nowrap; }
+.gi-overdue { color: var(--pm-danger); font-weight: 600; }
 .sub-inline { cursor: pointer; }
 .sub-inline:hover { background: var(--pm-primary-light); }
 .sub-inline.done { background: #e9f9f0; }

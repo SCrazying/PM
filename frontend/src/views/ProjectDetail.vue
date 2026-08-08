@@ -124,10 +124,25 @@
       <el-col :span="9">
         <div class="pm-card">
           <div class="pm-flex-between" style="margin-bottom:8px">
-            <span class="card-title">本周目标</span>
-            <el-button size="small" link type="primary" @click="goalVisible = true" v-if="canEdit">设定</el-button>
+            <span class="card-title">本周目标
+              <el-tag v-if="goalItems.length && goalItems.filter(g=>g.done).length===goalItems.length" size="small" type="success" style="margin-left:6px">全部完成</el-tag>
+            </span>
+            <el-button size="small" link type="primary" @click="openGoalItem()" v-if="canEdit">+ 添加</el-button>
           </div>
-          <div v-if="weeklyGoal" class="goal-text">{{ weeklyGoal }}</div>
+          <div v-if="goalItems.length" class="goal-items">
+            <div v-for="g in goalItems" :key="g.id" class="goal-item" :class="{ done: g.done }" @click="onToggleGoalItem(g)"
+                 :title="`${g.goal}（点击切换完成）`">
+              <el-icon :size="13"><Select v-if="g.done" /><CircleCheck v-else /></el-icon>
+              <span class="gi-goal">{{ g.goal }}</span>
+              <span v-if="g.done" class="gi-date">{{ g.done_at }}</span>
+              <span v-else-if="g.overdue" class="gi-date gi-overdue">超期 {{ g.deadline }}</span>
+              <span v-else-if="g.deadline" class="gi-date">{{ g.deadline }}</span>
+              <span v-if="canEdit" class="gi-ops" @click.stop>
+                <el-button link size="small" type="primary" @click="openGoalItem(g)">编</el-button>
+                <el-button link size="small" type="danger" @click="onDelGoalItem(g)">删</el-button>
+              </span>
+            </div>
+          </div>
           <div v-else class="empty">未设定本周目标</div>
         </div>
 
@@ -215,9 +230,16 @@
       </template>
     </el-dialog>
 
-    <!-- 周目标弹窗 -->
-    <el-dialog v-model="goalVisible" title="设定本周目标" width="440px">
-      <el-input v-model="goalText" type="textarea" :rows="3" placeholder="本周项目目标" />
+    <!-- 周目标条目弹窗 -->
+    <el-dialog v-model="goalVisible" :title="goalForm.id ? '编辑目标条目' : '添加目标条目'" width="440px">
+      <el-form label-width="80px">
+        <el-form-item label="目标" required>
+          <el-input v-model="goalForm.goal" type="textarea" :rows="2" placeholder="本周目标条目" />
+        </el-form-item>
+        <el-form-item label="截止时间">
+          <el-date-picker v-model="goalForm.deadline" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
+      </el-form>
       <template #footer>
         <el-button @click="goalVisible = false">取消</el-button>
         <el-button type="primary" @click="saveGoal">保存</el-button>
@@ -270,10 +292,11 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  addMember, addReview, addSubnode, createTask, deleteSubnode, deleteTask, getProject, getWeeklyGoal,
-  listMembers, listProgress, listReviews, listTasks, listUserOptions, nodeAdvance, nodeComplete,
-  nodeCompletion, projectCompletion, removeMember, setSubnodeStatus, setTaskStatus, setWeeklyGoal,
-  updateProgress, updateSubnode, updateTask,
+  addMember, addReview, addSubnode, addWeeklyGoalItem, createTask, deleteSubnode, deleteTask,
+  deleteWeeklyGoalItem, getProject, listMembers, listProgress, listReviews, listTasks,
+  listUserOptions, listWeeklyGoalItems, nodeAdvance, nodeComplete, nodeCompletion, projectCompletion,
+  removeMember, setSubnodeStatus, setTaskStatus, setWeeklyGoalItemDone,
+  updateProgress, updateSubnode, updateTask, updateWeeklyGoalItem,
 } from '../api'
 import { useUserStore } from '../store/user'
 import ProjectForm from '../components/ProjectForm.vue'
@@ -295,6 +318,7 @@ const progressVisible = ref(false)
 const progressSaving = ref(false)
 const progressForm = reactive({ id: null, progress_date: '', node_name: '', today_work: '', tomorrow_plan: '', risk: '' })
 const weeklyGoal = ref('')
+const goalItems = ref([])
 const nodeComp = ref({ total: 0, done: 0, percent: 100 })
 const projComp = ref({ total: 0, passed: 0, percent: 0 })
 const subnodes = ref([])
@@ -309,7 +333,7 @@ const memberForm = reactive({ user_id: null, project_role: '', is_invested: true
 const reviewVisible = ref(false)
 const reviewForm = reactive({ conclusion: 'pass', comment: '' })
 const goalVisible = ref(false)
-const goalText = ref('')
+const goalForm = reactive({ id: null, goal: '', deadline: null })
 const editFormRef = ref()
 
 const ownerName = computed(() => userName(project.value?.owner_id))
@@ -363,9 +387,35 @@ async function loadTasks() {
 async function loadProgress() { progressList.value = (await listProgress(pid, {})).slice(0, 20) }
 async function loadProjComp() { projComp.value = await projectCompletion(pid).catch(() => ({ total: 0, passed: 0, percent: 0 })) }
 async function loadGoal() {
-  const g = await getWeeklyGoal(pid, new Date().toISOString().slice(0, 10))
-  weeklyGoal.value = g.goal || ''
-  goalText.value = g.goal || ''
+  goalItems.value = await listWeeklyGoalItems(pid, new Date().toISOString().slice(0, 10)).catch(() => [])
+}
+
+// ---------- M7 周目标条目 ----------
+function openGoalItem(g) {
+  if (g) Object.assign(goalForm, { id: g.id, goal: g.goal, deadline: g.deadline })
+  else Object.assign(goalForm, { id: null, goal: '', deadline: null })
+  goalVisible.value = true
+}
+
+async function saveGoal() {
+  if (!goalForm.goal.trim()) { ElMessage.warning('请输入目标内容'); return }
+  if (goalForm.id) await updateWeeklyGoalItem(goalForm.id, goalForm)
+  else await addWeeklyGoalItem(pid, { week_start: new Date().toISOString().slice(0, 10), goal: goalForm.goal, deadline: goalForm.deadline })
+  ElMessage.success('已保存')
+  goalVisible.value = false
+  loadGoal()
+}
+
+async function onToggleGoalItem(g) {
+  await setWeeklyGoalItemDone(g.id, !g.done)
+  loadGoal()
+}
+
+async function onDelGoalItem(g) {
+  await ElMessageBox.confirm(`删除目标条目「${g.goal}」？`, '提示', { type: 'warning' })
+  await deleteWeeklyGoalItem(g.id)
+  ElMessage.success('已删除')
+  loadGoal()
 }
 
 function selectNode(n) { currentNode.value = n; loadTasks() }
@@ -474,11 +524,6 @@ async function onAdvance() {
   } catch (e) { /* 拦截器提示（如整改未闭环） */ }
 }
 
-async function saveGoal() {
-  await setWeeklyGoal(pid, { week_start: new Date().toISOString().slice(0, 10), goal: goalText.value })
-  ElMessage.success('已保存'); goalVisible.value = false; loadGoal()
-}
-
 async function saveMember() {
   if (!memberForm.user_id) { ElMessage.warning('请选择成员'); return }
   await addMember(pid, memberForm)
@@ -511,6 +556,17 @@ onMounted(loadAll)
 .sec-h { font-weight: 700; font-size: 13px; color: var(--pm-text-2); margin-bottom: 8px; }
 .review-item { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 6px; }
 .goal-text { font-size: 14px; line-height: 1.6; }
+.goal-items { display: flex; flex-direction: column; gap: 3px; }
+.goal-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.goal-item:hover { background: var(--pm-primary-light); }
+.goal-item.done { background: #e9f9f0; }
+.goal-item.done .gi-goal { color: var(--pm-success); text-decoration: line-through; }
+.goal-item .el-icon { color: var(--pm-primary); flex-shrink: 0; }
+.goal-item.done .el-icon { color: var(--pm-success); }
+.gi-goal { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
+.gi-date { color: var(--pm-text-3); font-size: 11.5px; white-space: nowrap; }
+.gi-overdue { color: var(--pm-danger); font-weight: 600; }
+.gi-ops { display: flex; gap: 2px; flex-shrink: 0; }
 .empty { color: var(--pm-text-3); font-size: 13px; padding: 8px 0; }
 .member-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--pm-border); }
 .member-item:last-child { border-bottom: none; }

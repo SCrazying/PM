@@ -45,6 +45,11 @@ export const setProgressRiskResolved = (id, resolved) => request.patch(`/progres
 export const myTodo = () => request.get('/progress/mine/todo')
 export const getWeeklyGoal = (projectId, week_start) => request.get(`/projects/${projectId}/weekly-goal`, { params: { week_start } })
 export const setWeeklyGoal = (projectId, data) => request.put(`/projects/${projectId}/weekly-goal`, data)
+export const listWeeklyGoalItems = (projectId, week_start) => request.get(`/projects/${projectId}/weekly-goal/items`, { params: { week_start } })
+export const addWeeklyGoalItem = (projectId, data) => request.post(`/projects/${projectId}/weekly-goal/items`, data)
+export const updateWeeklyGoalItem = (id, data) => request.patch(`/weekly-goal-items/${id}`, data)
+export const setWeeklyGoalItemDone = (id, done) => request.patch(`/weekly-goal-items/${id}/done`, { done })
+export const deleteWeeklyGoalItem = (id) => request.delete(`/weekly-goal-items/${id}`)
 
 // 周报 / 看板
 export const projectWeekly = (projectId, week_start) => request.get(`/reports/projects/${projectId}/weekly`, { params: { week_start } })

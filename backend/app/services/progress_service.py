@@ -2,11 +2,11 @@
 from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.responses import BizException, NotFoundError
-from app.models.misc import Progress, ProgressTaskLink, ProjectWeeklyGoal
+from app.models.misc import Progress, ProgressTaskLink, ProjectWeeklyGoal, WeeklyGoalItem
 from app.models.project import Project, ProjectNode, Task
 from app.models.user import User
 from app.schemas.progress import ProgressCreate, ProgressUpdate
@@ -237,3 +237,69 @@ class ProgressService:
         self.db.commit()
         self.db.refresh(row)
         return row
+
+    # ---------- 周目标条目（M7） ----------
+    def list_weekly_goal_items(self, project_id: int, week_start: date) -> List[dict]:
+        self.ps.get_project(project_id)
+        ws = self.week_start_of(week_start)
+        rows = self.db.execute(
+            select(WeeklyGoalItem).where(
+                WeeklyGoalItem.project_id == project_id, WeeklyGoalItem.week_start == ws,
+            ).order_by(WeeklyGoalItem.sequence, WeeklyGoalItem.id)
+        ).scalars().all()
+        return [{
+            "id": r.id, "goal": r.goal, "deadline": r.deadline,
+            "done": r.done, "done_at": r.done_at, "sequence": r.sequence,
+            "overdue": bool(not r.done and r.deadline and r.deadline < date.today()),
+        } for r in rows]
+
+    def add_weekly_goal_item(self, project_id: int, week_start, goal: str, deadline, user: dict) -> WeeklyGoalItem:
+        project = self.ps.get_project(project_id)
+        self.ps.check_owner(project, user)
+        if isinstance(week_start, str):
+            week_start = date.fromisoformat(week_start)
+        ws = self.week_start_of(week_start)
+        seq = self.db.execute(
+            select(func.count()).select_from(WeeklyGoalItem).where(
+                WeeklyGoalItem.project_id == project_id, WeeklyGoalItem.week_start == ws)
+        ).scalar_one() + 1
+        item = WeeklyGoalItem(project_id=project_id, week_start=ws, goal=goal, deadline=deadline, sequence=seq)
+        self.db.add(item)
+        self.db.commit()
+        self.db.refresh(item)
+        return item
+
+    def update_weekly_goal_item(self, item_id: int, goal, deadline, user: dict) -> WeeklyGoalItem:
+        item = self.db.get(WeeklyGoalItem, item_id)
+        if not item:
+            raise NotFoundError("周目标条目不存在")
+        project = self.ps.get_project(item.project_id)
+        self.ps.check_owner(project, user)
+        if goal is not None:
+            item.goal = goal
+        item.deadline = deadline
+        self.db.commit()
+        self.db.refresh(item)
+        return item
+
+    def set_weekly_goal_item_done(self, item_id: int, done: bool, user: dict) -> WeeklyGoalItem:
+        """完成/取消完成周目标条目（周会视图点击；成员可操作）。"""
+        item = self.db.get(WeeklyGoalItem, item_id)
+        if not item:
+            raise NotFoundError("周目标条目不存在")
+        project = self.ps.get_project(item.project_id)
+        self.ps.check_member(project, user)
+        item.done = done
+        item.done_at = date.today() if done else None
+        self.db.commit()
+        self.db.refresh(item)
+        return item
+
+    def delete_weekly_goal_item(self, item_id: int, user: dict) -> None:
+        item = self.db.get(WeeklyGoalItem, item_id)
+        if not item:
+            raise NotFoundError("周目标条目不存在")
+        project = self.ps.get_project(item.project_id)
+        self.ps.check_owner(project, user)
+        self.db.delete(item)
+        self.db.commit()

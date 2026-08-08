@@ -1,7 +1,7 @@
 """进展、关联、周目标、附件、AI 总结、审计、配置、通知模型。"""
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column
@@ -39,6 +39,19 @@ class ProjectWeeklyGoal(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     week_start: Mapped[date] = mapped_column(Date, nullable=False)
     goal: Mapped[str] = mapped_column(Text, nullable=False)
     set_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("user.id", ondelete="RESTRICT"))
+
+
+class WeeklyGoalItem(IdMixin, TimestampMixin, Base):
+    """项目周目标条目：goal + 截止时间 + 完成状态（周会视图逐条点击完成）。"""
+    __tablename__ = "weekly_goal_item"
+
+    project_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("project.id", ondelete="RESTRICT"), nullable=False)
+    week_start: Mapped[date] = mapped_column(Date, nullable=False)
+    goal: Mapped[str] = mapped_column(String(255), nullable=False)
+    deadline: Mapped[date | None] = mapped_column(Date)
+    done: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    done_at: Mapped[date | None] = mapped_column(Date)
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class Attachment(IdMixin, SoftDeleteMixin, Base):

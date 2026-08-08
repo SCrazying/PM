@@ -9,6 +9,7 @@ from app.models.misc import (
     Progress,
     ProgressTaskLink,
     ProjectWeeklyGoal,
+    WeeklyGoalItem,
 )
 from app.models.project import (
     NodeReview,
@@ -27,6 +28,6 @@ __all__ = [
     "Base",
     "User", "AuthToken", "PasswordReset",
     "Project", "ProjectMember", "ProjectRoleAssignment", "TrTemplate", "TrTemplateNode", "TrTemplateSubnode", "ProjectNode", "NodeReview", "Task",
-    "Progress", "ProgressTaskLink", "ProjectWeeklyGoal", "Attachment",
+    "Progress", "ProgressTaskLink", "ProjectWeeklyGoal", "WeeklyGoalItem", "Attachment",
     "AiSummary", "AuditLog", "Config", "Notification",
 ]

@@ -79,6 +79,41 @@ def set_weekly_goal(project_id: int, body: WeeklyGoalIn, user: dict = Depends(ge
     return ok({"id": row.id, "week_start": row.week_start}, message="已保存")
 
 
+# ---------- 周目标条目（M7） ----------
+@router.get("/projects/{project_id}/weekly-goal/items")
+def list_weekly_goal_items(project_id: int, week_start: date = Query(...), user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    return ok(ProgressService(db).list_weekly_goal_items(project_id, week_start))
+
+
+@router.post("/projects/{project_id}/weekly-goal/items")
+def add_weekly_goal_item(project_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    goal = (body.get("goal") or "").strip()
+    if not goal:
+        from app.core.responses import BizException
+        raise BizException("目标内容不能为空")
+    item = ProgressService(db).add_weekly_goal_item(
+        project_id, body.get("week_start") or date.today(), goal, body.get("deadline"), user)
+    return ok({"id": item.id}, message="已添加")
+
+
+@router.patch("/weekly-goal-items/{item_id}")
+def update_weekly_goal_item(item_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    item = ProgressService(db).update_weekly_goal_item(item_id, body.get("goal"), body.get("deadline"), user)
+    return ok({"id": item.id}, message="已更新")
+
+
+@router.patch("/weekly-goal-items/{item_id}/done")
+def set_weekly_goal_item_done(item_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    item = ProgressService(db).set_weekly_goal_item_done(item_id, bool(body.get("done")), user)
+    return ok({"id": item.id, "done": item.done, "done_at": item.done_at}, message="已更新")
+
+
+@router.delete("/weekly-goal-items/{item_id}")
+def delete_weekly_goal_item(item_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    ProgressService(db).delete_weekly_goal_item(item_id, user)
+    return ok(message="已删除")
+
+
 # ---------- 周报 ----------
 @router.get("/reports/projects/{project_id}/weekly")
 def project_weekly(project_id: int, week_start: date = Query(...), user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
