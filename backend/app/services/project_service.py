@@ -22,6 +22,8 @@ from app.models.misc import (
     WeeklyGoalItem,
 )
 from app.models.project import (
+    ACTIVE_PROJECT_STATUSES,
+    PROJECT_STATUSES,
     NodeReview,
     Project,
     ProjectMember,
@@ -112,9 +114,13 @@ class ProjectService:
         if not owner:
             raise NotFoundError("负责人用户不存在")
 
+        status = body.status or "in_progress"
+        if status not in PROJECT_STATUSES:
+            raise BizException("项目状态不合法", code=400, http_status=400)
+
         project = Project(
             name=body.name, code=body.code, machine_model=body.machine_model,
-            owner_id=body.owner_id, status="in_progress",
+            owner_id=body.owner_id, status=status,
             start_date=body.start_date, end_date=body.end_date,
             description=body.description, created_by=operator_id,
         )
@@ -224,6 +230,12 @@ class ProjectService:
             ).scalar_one_or_none()
             if exists:
                 raise BizException("项目编号已存在", code=409, http_status=409)
+        # 项目状态手动配置：白名单校验；置归档时补记 archived_at
+        if "status" in data:
+            if data["status"] not in PROJECT_STATUSES:
+                raise BizException("项目状态不合法", code=400, http_status=400)
+            if data["status"] == "archived" and project.status != "archived":
+                project.archived_at = date.today()
         for f, v in data.items():
             setattr(project, f, v)
         if role_assignments is not None:

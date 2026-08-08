@@ -27,19 +27,14 @@ def list_progress(project_id: int, date_from: date | None = None, date_to: date 
 
 @router.post("/projects/{project_id}/progress")
 def create_progress(project_id: int, body: ProgressCreate, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    from app.models.project import Project
     p = ProgressService(db).create_progress(project_id, body, user)
-    # 填报后重算项目 health（可能有 risk）
-    BoardService(db).refresh_health(db.get(Project, p.project_id))
     db.commit()
     return ok({"id": p.id}, message="填报成功")
 
 
 @router.put("/progress/{progress_id}")
 def update_progress(progress_id: int, body: ProgressUpdate, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    from app.models.project import Project
     progress = ProgressService(db).update_progress(progress_id, body, user)
-    BoardService(db).refresh_health(db.get(Project, progress.project_id))
     db.commit()
     record_audit(db, user["user_id"], "update", "progress", str(progress_id), body.model_dump(exclude_none=True))
     return ok(message="已更新")
@@ -53,10 +48,7 @@ def delete_progress(progress_id: int, user: dict = Depends(get_current_user), db
 
 @router.patch("/progress/{progress_id}/risk-resolve")
 def set_risk_resolved(progress_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    from app.models.project import Project
     p = ProgressService(db).set_risk_resolved(progress_id, bool(body.get("resolved")), user)
-    # 关闭/打开风险后重算项目 health
-    BoardService(db).refresh_health(db.get(Project, p.project_id))
     db.commit()
     return ok({"id": p.id, "resolved": p.risk_resolved}, message="已关闭风险" if p.risk_resolved else "已重新打开")
 
@@ -157,12 +149,6 @@ def board(granularity: str = "month", year: int | None = None, month: int | None
           machine_model: str | None = None, owner_id: int | None = None,
           user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     return ok(BoardService(db).board(granularity, year, month, machine_model, owner_id))
-
-
-@router.post("/board/refresh-health")
-def refresh_health(user: dict = Depends(require_admin), db: Session = Depends(get_db)):
-    n = BoardService(db).refresh_all_health()
-    return ok({"refreshed": n}, message=f"已重算 {n} 个项目健康度")
 
 
 # ---------- 节点流转 ----------

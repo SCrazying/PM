@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.project_roles import PROJECT_ROLE_NAMES, canonical_project_role
 from app.models.misc import Progress, ProjectWeeklyGoal, WeeklyGoalItem
-from app.models.project import Project, ProjectMember, ProjectNode, ProjectRoleAssignment, Task
+from app.models.project import ACTIVE_PROJECT_STATUSES, Project, ProjectMember, ProjectNode, ProjectRoleAssignment, Task
 from app.models.user import User
 from app.services.progress_service import ProgressService
 
@@ -194,7 +194,7 @@ class ReportService:
     # ---------- 组内周报：按项目 ----------
     def group_weekly_by_project(self, week_start: date) -> list[dict]:
         projects = self.db.execute(
-            select(Project).where(Project.is_deleted.is_(False), Project.status == "in_progress")
+            select(Project).where(Project.is_deleted.is_(False), Project.status.in_(ACTIVE_PROJECT_STATUSES))
             .order_by(Project.id)
         ).scalars().all()
         return [self.project_weekly(p.id, week_start)["project"] | {"week_start": self._week_range(week_start)[0],
@@ -370,7 +370,7 @@ class ReportService:
             mems = self.db.execute(
                 select(ProjectMember, Project).join(Project, Project.id == ProjectMember.project_id).where(
                     ProjectMember.user_id == u.id, ProjectMember.is_deleted.is_(False),
-                    Project.is_deleted.is_(False), Project.status == "in_progress",
+                    Project.is_deleted.is_(False), Project.status.in_(ACTIVE_PROJECT_STATUSES),
                 )
             ).all()
             if not mems:

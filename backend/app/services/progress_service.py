@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.responses import BizException, NotFoundError
 from app.models.misc import Progress, ProgressTaskLink, ProjectWeeklyGoal, WeeklyGoalItem
-from app.models.project import Project, ProjectNode, Task
+from app.models.project import ACTIVE_PROJECT_STATUSES, Project, ProjectNode, Task
 from app.models.user import User
 from app.schemas.progress import ProgressCreate, ProgressUpdate
 from app.services.project_service import ProjectService
@@ -153,7 +153,7 @@ class ProgressService:
                 ProjectMember.user_id == user["user_id"],
                 ProjectMember.is_deleted.is_(False),
                 Project.is_deleted.is_(False),
-                Project.status == "in_progress",
+                Project.status.in_(ACTIVE_PROJECT_STATUSES),
             )
         ).all()
         projects = []

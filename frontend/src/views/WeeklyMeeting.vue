@@ -7,6 +7,11 @@
       <el-select v-model="filterMachine" clearable filterable placeholder="按机型筛选" style="width: 150px">
         <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
       </el-select>
+      <template v-if="view === 'project'">
+        <el-select v-model="filterStatus" clearable placeholder="状态筛选" style="width: 130px">
+          <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
+      </template>
       <template v-if="view === 'person'">
         <el-select v-model="filterPerson" clearable filterable placeholder="按人筛选" style="width: 130px">
           <el-option v-for="u in personUsers" :key="u.user_id" :label="u.display_name" :value="u.user_id" />
@@ -101,6 +106,11 @@
             <div class="pm-sub">{{ row.project.code }}</div>
           </template>
         </el-table-column>
+        <el-table-column label="状态" width="96">
+          <template #default="{ row }">
+            <el-tag size="small" :type="statusTag(row.project.status)">{{ statusMap[row.project.status] || row.project.status }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="项目角色" min-width="180">
           <template #default="{ row }">
             <span class="role-summary">{{ row.project.project_roles || '未分配' }}</span>
@@ -160,14 +170,6 @@
               </div>
             </div>
             <span v-else class="pm-sub">无</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="任务概况" width="100" align="center">
-          <template #default="{ row }">{{ doneTaskCount(row.tasks) }}/{{ row.tasks.length }}</template>
-        </el-table-column>
-        <el-table-column label="健康度" width="90" align="center">
-          <template #default="{ row }">
-            <span class="health-cell"><span class="pm-dot" :class="healthDot(row.project.health)"></span>{{ healthText(row.project.health) }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -233,8 +235,10 @@ const machineOptions = computed(() => {
   return [...set]
 })
 const filteredReports = computed(() => {
-  if (!filterMachine.value) return projectReports.value
-  return projectReports.value.filter((p) => p.project?.machine_model === filterMachine.value)
+  let list = projectReports.value
+  if (filterMachine.value) list = list.filter((p) => p.project?.machine_model === filterMachine.value)
+  if (filterStatus.value) list = list.filter((p) => p.project?.status === filterStatus.value)
+  return list
 })
 const personReports = ref([])
 const expandedProjects = ref([])
@@ -243,6 +247,7 @@ const exporting = ref(false)
 // FO/TL 筛选：按人 + 角色，方便查看某个人投入了哪些项目
 const filterPerson = computed({ get: () => viewFilters.weekly.filterPerson, set: (v) => { viewFilters.weekly.filterPerson = v } })
 const filterRole = computed({ get: () => viewFilters.weekly.filterRole, set: (v) => { viewFilters.weekly.filterRole = v } })
+const filterStatus = computed({ get: () => viewFilters.weekly.filterStatus, set: (v) => { viewFilters.weekly.filterStatus = v } })
 const roleFilterOptions = [
   { value: 'TL/FO', label: 'FO/TL' },
   { value: 'SE', label: 'SE' },
@@ -264,8 +269,17 @@ const filteredPersonReports = computed(() => {
   return list
 })
 
-const healthDot = (h) => ({ on_track: 'success', at_risk: 'warning', delayed: 'danger' }[h] || 'info')
-const healthText = (h) => ({ on_track: '正常', at_risk: '风险', delayed: '延期' }[h] || h)
+// 项目状态（手动配置）显示
+const statusOptions = [
+  { value: 'not_started', label: '未开始' },
+  { value: 'in_progress', label: '进行中' },
+  { value: 'delayed', label: '延期' },
+  { value: 'completed', label: '已完成' },
+  { value: 'suspended', label: '暂停' },
+  { value: 'archived', label: '归档' },
+]
+const statusMap = Object.fromEntries(statusOptions.map((o) => [o.value, o.label]))
+const statusTag = (s) => ({ in_progress: 'primary', delayed: 'danger', completed: 'success', archived: 'info', suspended: 'warning' }[s] || 'info')
 const taskTag = (t) => (t.status === 'done' ? 'success' : t.overdue ? 'danger' : t.status === 'in_progress' ? 'primary' : 'info')
 const taskText = (t) => (t.status === 'done' ? '已完成' : t.overdue ? '逾期' : t.status === 'in_progress' ? '进行中' : '未开始')
 const doneTaskCount = (tasks) => tasks.filter((t) => t.status === 'done').length
@@ -321,7 +335,7 @@ async function load() {
   loading.value = true
   try {
     if (view.value === 'project') {
-      const projects = await listProjects({ status: 'in_progress', size: 100 })
+      const projects = await listProjects({ size: 200 })
       const reports = []
       for (const p of projects.list) reports.push(await projectWeekly(p.id, weekStart.value))
       projectReports.value = reports
@@ -369,7 +383,6 @@ onMounted(load)
 .project-name:hover { text-decoration: underline; }
 .role-summary { white-space: pre-line; line-height: 1.45; font-size: 12px; }
 .node-deadline { margin-top: 3px; }
-.health-cell { display: inline-flex; align-items: center; gap: 6px; }
 .report-body { padding: 6px 4px; }
 .rb-sec { margin-bottom: 8px; }
 .rb-h { font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--pm-text-2); }

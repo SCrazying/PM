@@ -48,6 +48,7 @@ class ProjectCreate(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     description: Optional[str] = None
+    status: Optional[str] = None        # 手动状态，缺省 in_progress（白名单见 ProjectService）
     node_ids: List[int] = []          # 立项自选的模板节点 id（tr_template_node.id）
     members: List[MemberIn] = []      # 初始成员
     role_assignments: RoleAssignments = Field(default_factory=dict)

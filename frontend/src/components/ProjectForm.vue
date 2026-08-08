@@ -52,6 +52,13 @@
             <el-date-picker v-model="form.end_date" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
           </el-form-item>
         </el-col>
+        <el-col :span="12">
+          <el-form-item label="状态">
+            <el-select v-model="form.status" style="width: 100%">
+              <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+          </el-form-item>
+        </el-col>
       </el-row>
       <el-form-item label="描述">
         <el-input v-model="form.description" type="textarea" :rows="2" />
@@ -121,6 +128,15 @@ const roleOptions = [
   { key: 'TL/FO', label: 'TL/FO', multiple: true },
   { key: 'CodeReview', label: 'CodeReview', multiple: true },
 ]
+// 项目状态：手动配置
+const statusOptions = [
+  { value: 'not_started', label: '未开始' },
+  { value: 'in_progress', label: '进行中' },
+  { value: 'delayed', label: '延期' },
+  { value: 'completed', label: '已完成' },
+  { value: 'suspended', label: '暂停' },
+  { value: 'archived', label: '归档' },
+]
 
 function emptyRoleAssignments() {
   return { SE: null, TPM: null, 'TL/FO': [], CodeReview: [] }
@@ -148,7 +164,7 @@ function setRoleAssignments(value) {
 }
 
 const form = reactive({
-  name: '', code: '', machine_model: '', owner_id: null,
+  name: '', code: '', machine_model: '', owner_id: null, status: 'in_progress',
   start_date: null, end_date: null, description: '',
   template_id: null, node_ids: [], node_plans: {}, node_deadlines: {}, role_assignments: emptyRoleAssignments(),
 })
@@ -234,7 +250,8 @@ async function open(project) {
     projectNodes.value = project.nodes || []
     Object.assign(form, {
       name: project.name, code: project.code, machine_model: project.machine_model,
-      owner_id: project.owner_id, start_date: project.start_date, end_date: project.end_date,
+      owner_id: project.owner_id, status: project.status || 'in_progress',
+      start_date: project.start_date, end_date: project.end_date,
       description: project.description, template_id: null,
       node_ids: (project.nodes || []).filter((n) => !n.is_deleted).map((n) => n.id),  // 勾选启用节点
       node_plans: {},
@@ -245,7 +262,8 @@ async function open(project) {
     editId.value = null
     projectNodes.value = []
     Object.assign(form, {
-      name: '', code: '', machine_model: '', owner_id: null, start_date: null, end_date: null,
+      name: '', code: '', machine_model: '', owner_id: null, status: 'in_progress',
+      start_date: null, end_date: null,
       description: '', template_id: templates.value[0]?.id || null, node_ids: [], node_plans: {}, node_deadlines: {},
     })
     setRoleAssignments()
@@ -262,7 +280,7 @@ async function onSubmit() {
   try {
     if (isEdit.value) {
       await updateProject(editId.value, {
-        name: form.name, code: form.code, machine_model: form.machine_model, owner_id: form.owner_id,
+        name: form.name, code: form.code, machine_model: form.machine_model, owner_id: form.owner_id, status: form.status,
         start_date: form.start_date, end_date: form.end_date, description: form.description,
         role_assignments: roleAssignmentPayload(), node_deadlines: nodeDeadlinePayload(),
         node_enabled_ids: [...form.node_ids],
@@ -270,7 +288,7 @@ async function onSubmit() {
       ElMessage.success('已更新')
     } else {
       await createProject({
-        name: form.name, code: form.code, machine_model: form.machine_model, owner_id: form.owner_id,
+        name: form.name, code: form.code, machine_model: form.machine_model, owner_id: form.owner_id, status: form.status,
         start_date: form.start_date, end_date: form.end_date, description: form.description,
         node_ids: form.node_ids, node_plans: nodePlanPayload(), members: [], role_assignments: roleAssignmentPayload(),
       })

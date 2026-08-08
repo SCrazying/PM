@@ -23,14 +23,18 @@
       <el-table-column label="当前节点" width="140">
         <template #default="{ row }">{{ nodeCache[row.id] || '—' }}</template>
       </el-table-column>
-      <el-table-column label="状态" width="100">
+      <el-table-column label="状态" width="132">
         <template #default="{ row }">
-          <el-tag :type="statusTag(row.status)">{{ statusMap[row.status] || row.status }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="健康度" width="90">
-        <template #default="{ row }">
-          <el-tag :type="healthTag(row.health)" effect="plain">{{ healthMap[row.health] || row.health }}</el-tag>
+          <el-select
+            v-if="canEditStatus(row)"
+            :model-value="row.status"
+            size="small"
+            style="width: 112px"
+            @change="(v) => onStatusChange(row, v)"
+          >
+            <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+          <el-tag v-else :type="statusTag(row.status)">{{ statusMap[row.status] || row.status }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="200" fixed="right">
@@ -55,11 +59,13 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { archiveProject, deleteProject, getProject, listMachineOptions, listProjects, unarchiveProject } from '../api'
+import { archiveProject, deleteProject, getProject, listMachineOptions, listProjects, unarchiveProject, updateProject } from '../api'
 import ProjectForm from '../components/ProjectForm.vue'
 import { useViewFilterStore } from '../store/filters'
+import { useUserStore } from '../store/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 const formRef = ref()
 const loading = ref(false)
 const rows = ref([])
@@ -68,10 +74,33 @@ const nodeCache = ref({})
 const machineOptions = ref([])
 const query = useViewFilterStore().projectList
 
-const statusMap = { not_started: '未开始', in_progress: '进行中', suspended: '暂停', completed: '已完成', archived: '已归档' }
-const healthMap = { on_track: '正常', at_risk: '风险', delayed: '延期' }
-const statusTag = (s) => ({ in_progress: 'primary', completed: 'success', archived: 'info', suspended: 'warning' }[s] || 'info')
-const healthTag = (h) => ({ on_track: 'success', at_risk: 'warning', delayed: 'danger' }[h] || 'info')
+// 项目状态：手动配置（未开始/进行中/延期/已完成/暂停/归档）
+const statusOptions = [
+  { value: 'not_started', label: '未开始' },
+  { value: 'in_progress', label: '进行中' },
+  { value: 'delayed', label: '延期' },
+  { value: 'completed', label: '已完成' },
+  { value: 'suspended', label: '暂停' },
+  { value: 'archived', label: '归档' },
+]
+const statusMap = Object.fromEntries(statusOptions.map((o) => [o.value, o.label]))
+const statusTag = (s) => ({ in_progress: 'primary', delayed: 'danger', completed: 'success', archived: 'info', suspended: 'warning' }[s] || 'info')
+
+// 状态内联编辑：仅负责人/管理员可改，其余只读展示
+const canEditStatus = (row) => userStore.isAdmin || row.owner_id === userStore.userInfo?.user_id
+
+async function onStatusChange(row, status) {
+  const prev = row.status
+  row.status = status
+  try {
+    const data = await updateProject(row.id, { status })
+    row.status = data.status
+    ElMessage.success(`状态已改为「${statusMap[status] || status}」`)
+  } catch {
+    row.status = prev
+    ElMessage.error('状态更新失败')
+  }
+}
 
 async function load() {
   loading.value = true

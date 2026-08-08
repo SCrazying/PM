@@ -7,7 +7,6 @@
           <div class="pname">
             {{ project.name }}
             <el-tag size="small" effect="plain" style="margin-left:8px">{{ project.machine_model || '无机型' }}</el-tag>
-            <el-tag size="small" :type="healthTag(project.health)" style="margin-left:6px">{{ healthText(project.health) }}</el-tag>
           </div>
           <div class="pmeta">编号 {{ project.code }} ｜ 负责人 {{ ownerName }} ｜ {{ statusMap[project.status] }}</div>
         </div>
@@ -325,7 +324,7 @@ const subnodes = ref([])
 const subnodeVisible = ref(false)
 const subnodeForm = reactive({ id: null, name: '', planned_end: null })
 
-const statusMap = { not_started: '未开始', in_progress: '进行中', suspended: '暂停', completed: '已完成', archived: '已归档' }
+const statusMap = { not_started: '未开始', in_progress: '进行中', delayed: '延期', suspended: '暂停', completed: '已完成', archived: '归档' }
 const taskVisible = ref(false)
 const taskForm = reactive({ id: null, title: '', assignee_id: null, planned_start: null, planned_end: null, description: '' })
 const memberVisible = ref(false)
@@ -345,8 +344,6 @@ const canEdit = computed(() => store.isAdmin || project.value?.owner_id === stor
 const canReview = computed(() => canEdit.value && currentNode.value && ['in_progress', 'pending_review'].includes(currentNode.value.status))
 
 function userName(id) { return users.value.find((u) => u.id === id)?.display_name || (id ? `#${id}` : '—') }
-const healthTag = (h) => ({ on_track: 'success', at_risk: 'warning', delayed: 'danger' }[h] || 'info')
-const healthText = (h) => ({ on_track: '正常', at_risk: '风险', delayed: '延期' }[h] || h)
 const reviewTag = (c) => ({ pass: 'success', conditional_pass: 'warning', fail: 'danger' }[c])
 const reviewText = (c) => ({ pass: '通过', conditional_pass: '有条件通过', fail: '不通过' }[c])
 

@@ -48,7 +48,7 @@
 - `project.name` = 项目列文本（trim）。
 - `project.machine_model` = 机型列文本。
 - `project.code`：优先取"项目代号映射表"（可上传第二 sheet 或配置）；缺省自动生成 `P + 年份 + 序号`，导入后可改。
-- `project.status`：默认 `in_progress`（导入的均为在研）；可在预览时逐项目调整。
+- `project.status`：默认 `in_progress`（导入的均为在研）；可在预览时逐项目调整，导入后也可在项目列表**内联修改状态**（未开始/进行中/延期/已完成/暂停/归档）。
 - `project.start_date/end_date`：Excel 无此列 → 留空，导入后补。
 
 ### 3.2 成员（是否投入 / 项目角色）

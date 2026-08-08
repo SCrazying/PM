@@ -24,7 +24,6 @@
             <div v-for="p in col.items" :key="p.id" class="proj-card" @click="goDetail(p)">
               <div class="pc-top">
                 <span class="pc-name">{{ p.name }}</span>
-                <el-tag size="small" effect="plain" :type="healthTag(p.health)">{{ healthText(p.health) }}</el-tag>
               </div>
               <div class="pc-meta">
                 <span v-if="p.machine_model" class="pc-model">{{ p.machine_model }}</span>
@@ -57,9 +56,6 @@ const columns = ref([
   { key: 'completed', title: '已完成', color: '#22c07a', items: [] },
   { key: 'suspended', title: '暂停', color: '#f5a623', items: [] },
 ])
-
-const healthTag = (h) => ({ on_track: 'success', at_risk: 'warning', delayed: 'danger' }[h] || 'info')
-const healthText = (h) => ({ on_track: '正常', at_risk: '风险', delayed: '延期' }[h] || h)
 
 async function load() {
   loading.value = true
