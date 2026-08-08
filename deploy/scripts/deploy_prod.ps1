@@ -7,7 +7,7 @@ param(
     [int]$Port = 8001,                  # 后端端口（默认 8001）
     [string]$ServiceName = "pm-system", # Windows 服务名
     [string]$AppUser = "pm",
-    [string]$AppPassword = "postgres",  # 数据库应用密码（内网统一 postgres）
+    [string]$AppPassword = "pm123",  # 数据库应用密码（内网统一 postgres）
     [string]$DbName = "pm_system",
     [string]$JwtSecret = ""             # 不填则自动生成随机密钥
 )
@@ -26,8 +26,18 @@ $BackendDir = Join-Path $Root "backend"
 $Nssm = Join-Path $Root "deploy\bin\nssm.exe"
 $InitDb = Join-Path $PSScriptRoot "init_db.ps1"
 
-if (-not (Test-Path $Python)) { throw "未找到便携 Python：$Python（请确认完整拷贝 pm-prod 目录）" }
-if (-not (Test-Path $Nssm)) { throw "未找到 NSSM：$Nssm" }
+if (-not (Test-Path $Python) -or -not (Test-Path $Nssm)) {
+    Write-Host ""
+    Write-Host "[错误] 部署包结构不完整：" -ForegroundColor Red
+    Write-Host "  便携 Python: $Python  -> $([bool](Test-Path $Python))" -ForegroundColor Yellow
+    Write-Host "  NSSM:         $Nssm    -> $([bool](Test-Path $Nssm))" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "请确认使用方式：" -ForegroundColor Cyan
+    Write-Host "  1) 解压完整 pm-prod.zip（不要只拷单个脚本）" -ForegroundColor Cyan
+    Write-Host "  2) 从 pm-prod\deploy\scripts\deploy_prod.ps1 运行本脚本（脚本必须位于部署包内的 deploy\scripts 目录，不能单独拷出）" -ForegroundColor Cyan
+    Write-Host "  3) 部署包根目录下应含：runtime\python、backend、frontend\dist、db、deploy\bin\nssm.exe" -ForegroundColor Cyan
+    throw "部署包结构不完整（请解压完整 pm-prod.zip 后在包内运行）"
+}
 
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "  PM-System 生产一键部署" -ForegroundColor Cyan
@@ -86,10 +96,14 @@ try {
 # ---------- 3. NSSM 注册 Windows 服务 ----------
 Write-Host "[服务] 注册 Windows 服务 $ServiceName ..." -ForegroundColor Yellow
 
-# 幂等：若已存在同名服务，先停止并移除
-& $Nssm stop $ServiceName 2>$null | Out-Null
-& $Nssm remove $ServiceName confirm 2>$null | Out-Null
-Start-Sleep -Seconds 1
+# 幂等：若已存在同名服务，先停止并移除（服务不存在时静默跳过，避免 nssm stop 报错）
+$svcExists = $null -ne (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)
+if ($svcExists) {
+    & $Nssm stop $ServiceName 2>$null | Out-Null
+    Start-Sleep -Seconds 1
+    & $Nssm remove $ServiceName confirm 2>$null | Out-Null
+    Start-Sleep -Seconds 1
+}
 
 # 安装服务（python 路径加引号防空格；NSSM 装服务需管理员权限）
 & $Nssm install $ServiceName "`"$Python`""
