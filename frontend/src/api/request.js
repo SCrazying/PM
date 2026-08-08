@@ -64,7 +64,13 @@ request.interceptors.response.use(
       router.push({ name: 'login' })
       ElMessage.error('登录已过期，请重新登录')
     } else {
-      ElMessage.error(response?.data?.message || error.message || '网络错误')
+      // 422 为参数校验失败，展示 FastAPI detail 具体字段错误
+      let msg = response?.data?.message
+      const detail = response?.data?.detail
+      if (Array.isArray(detail) && detail.length) {
+        msg = detail.map((d) => (typeof d === 'string' ? d : d.msg || d.loc?.join('.') || JSON.stringify(d))).join('；')
+      }
+      ElMessage.error(msg || error.message || '网络错误')
     }
     return Promise.reject(error)
   }
