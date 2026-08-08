@@ -56,6 +56,7 @@ class ProjectCreate(BaseModel):
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
+    code: Optional[str] = None
     machine_model: Optional[str] = None
     owner_id: Optional[int] = None
     status: Optional[str] = None

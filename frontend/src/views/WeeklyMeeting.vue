@@ -89,7 +89,7 @@
         </el-table-column>
         <el-table-column label="项目" min-width="180">
           <template #default="{ row }">
-            <div class="project-name">{{ row.project.name }}</div>
+            <div class="project-name" @click="goDetail(row.project)">{{ row.project.name }}</div>
             <div class="pm-sub">{{ row.project.code }}</div>
           </template>
         </el-table-column>
@@ -100,8 +100,8 @@
         </el-table-column>
         <el-table-column label="当前节点" min-width="200">
           <template #default="{ row }">
-            <div v-if="row.project.nodes && row.project.nodes.length" class="cn-list">
-              <div v-for="n in row.project.nodes" :key="n.id" class="cn-row" :class="{ current: n.is_current, done: n.status==='passed' }">
+            <div v-if="currentNodeList(row).length" class="cn-list">
+              <div v-for="n in currentNodeList(row)" :key="n.id" class="cn-row" :class="{ current: n.is_current, done: n.status==='passed' }">
                 <el-tag size="small" effect="plain"
                         :type="n.is_current ? 'primary' : (n.status==='passed' ? 'success' : 'info')">{{ n.node_key }}</el-tag>
                 <el-tag v-if="n.overdue" size="small" type="warning">超期</el-tag>
@@ -205,10 +205,12 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { groupWeekly, projectWeekly, listProjects, exportLedger, setSubnodeStatus, setProgressRiskResolved, setWeeklyGoalItemDone } from '../api'
 import { ElMessage } from 'element-plus'
 import { useViewFilterStore } from '../store/filters'
 
+const router = useRouter()
 const viewFilters = useViewFilterStore()
 const weekStart = computed({ get: () => viewFilters.weekly.weekStart, set: (v) => { viewFilters.weekly.weekStart = v } })
 const view = computed({ get: () => viewFilters.weekly.view, set: (v) => { viewFilters.weekly.view = v } })
@@ -235,6 +237,14 @@ const healthText = (h) => ({ on_track: '正常', at_risk: '风险', delayed: '�
 const taskTag = (t) => (t.status === 'done' ? 'success' : t.overdue ? 'danger' : t.status === 'in_progress' ? 'primary' : 'info')
 const taskText = (t) => (t.status === 'done' ? '已完成' : t.overdue ? '逾期' : t.status === 'in_progress' ? '进行中' : '未开始')
 const doneTaskCount = (tasks) => tasks.filter((t) => t.status === 'done').length
+
+// 当前节点列：隐藏已完成的节点，只显示进行中/待开始的
+const currentNodeList = (row) => (row.project.nodes || []).filter((n) => n.status !== 'passed')
+
+// 跳转项目详情
+function goDetail(project) {
+  router.push({ name: 'project-detail', params: { id: project.id } })
+}
 
 // 短日期 MM-DD
 const shortDate = (d) => (d ? String(d).slice(5) : '')
@@ -323,7 +333,8 @@ onMounted(load)
 </script>
 
 <style scoped>
-.project-name { font-weight: 700; }
+.project-name { font-weight: 700; cursor: pointer; color: var(--pm-primary); }
+.project-name:hover { text-decoration: underline; }
 .role-summary { white-space: pre-line; line-height: 1.45; font-size: 12px; }
 .node-deadline { margin-top: 3px; }
 .health-cell { display: inline-flex; align-items: center; gap: 6px; }

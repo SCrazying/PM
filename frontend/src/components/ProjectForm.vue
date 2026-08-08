@@ -7,7 +7,7 @@
       <el-row :gutter="12">
         <el-col :span="12">
           <el-form-item label="项目编号" prop="code">
-            <el-input v-model="form.code" :disabled="isEdit" placeholder="如：P2026001" />
+            <el-input v-model="form.code" placeholder="如：P2026001" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
@@ -168,8 +168,9 @@ const selectedTemplateNodes = computed(() => templateNodes.value.filter((n) => f
 const editableProjectNodes = computed(() => projectNodes.value)
 
 function ensureNodePlans() {
+  // 遍历全部模板节点（而非仅勾选的），保证取消勾选再勾选后已填的计划完成日期不丢失
   const next = {}
-  for (const n of selectedTemplateNodes.value) {
+  for (const n of templateNodes.value) {
     const current = form.node_plans[n.id] || {}
     next[n.id] = {
       template_node_id: n.id,
@@ -261,7 +262,7 @@ async function onSubmit() {
   try {
     if (isEdit.value) {
       await updateProject(editId.value, {
-        name: form.name, machine_model: form.machine_model, owner_id: form.owner_id,
+        name: form.name, code: form.code, machine_model: form.machine_model, owner_id: form.owner_id,
         start_date: form.start_date, end_date: form.end_date, description: form.description,
         role_assignments: roleAssignmentPayload(), node_deadlines: nodeDeadlinePayload(),
         node_enabled_ids: [...form.node_ids],

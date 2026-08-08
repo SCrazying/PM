@@ -199,6 +199,15 @@ class ProjectService:
             if not new_owner:
                 raise NotFoundError("新负责人不存在")
             self._upsert_member(project.id, data["owner_id"], "负责人", True)
+        # 项目编号变更：唯一性校验（软删兼容）
+        if "code" in data and data["code"] != project.code:
+            exists = self.db.execute(
+                select(Project).where(
+                    Project.code == data["code"], Project.is_deleted.is_(False), Project.id != project_id
+                )
+            ).scalar_one_or_none()
+            if exists:
+                raise BizException("项目编号已存在", code=409, http_status=409)
         for f, v in data.items():
             setattr(project, f, v)
         if role_assignments is not None:
