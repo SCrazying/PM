@@ -24,7 +24,9 @@ param(
 
     [string]$Psql = "",
 
-    [string]$BackendDir = ""
+    [string]$BackendDir = "",
+
+    [string]$Python = ""    # 便携 Python 路径（内网未装 Python 时传入，用于迁移/种子）
 
 )
 
@@ -192,7 +194,11 @@ Push-Location $BackendDir
 
 try {
 
-    if (Test-Path (Join-Path $BackendDir "venv\Scripts\alembic.exe")) {
+    $PyDir = $BackendDir.Replace('', '/')
+
+    if ($Python -and (Test-Path $Python)) {
+        & $Python -m alembic upgrade head
+    } elseif (Test-Path (Join-Path $BackendDir "venv\Scripts\alembic.exe")) {
 
         & (Join-Path $BackendDir "venv\Scripts\alembic.exe") upgrade head
 
@@ -224,13 +230,17 @@ try {
 
     }
 
-    if (Get-Command python -ErrorAction SilentlyContinue) {
+    if ($Python -and (Test-Path $Python)) {
 
-        & python -m app.seed
+        & $Python -c "import sys; sys.path.insert(0, r'$PyDir'); from app.seed import run; sys.exit(run())"
+
+    } elseif (Get-Command python -ErrorAction SilentlyContinue) {
+
+        & python -c "import sys; sys.path.insert(0, r'$PyDir'); from app.seed import run; sys.exit(run())"
 
     } else {
 
-        & (Join-Path $BackendDir "venv\Scripts\python.exe") -m app.seed
+        & (Join-Path $BackendDir "venv\Scripts\python.exe") -c "import sys; sys.path.insert(0, r'$PyDir'); from app.seed import run; sys.exit(run())"
 
     }
 

@@ -61,7 +61,8 @@ Write-Host "[配置] 已生成 $envFile（JWT_SECRET 已随机）" -ForegroundCo
 # ---------- 1. 数据库初始化（复用 init_db.ps1，幂等） ----------
 Write-Host "[数据库] 检查/初始化 PostgreSQL（需超级用户密码）..." -ForegroundColor Yellow
 & powershell -NoProfile -ExecutionPolicy Bypass -File $InitDb `
-    -PgPassword $PgPassword -AppUser $AppUser -AppPassword $AppPassword -DbName $DbName -BackendDir $BackendDir
+    -PgPassword $PgPassword -AppUser $AppUser -AppPassword $AppPassword -DbName $DbName `
+    -BackendDir $BackendDir -Python $Python
 if ($LASTEXITCODE -ne 0) { throw "数据库初始化失败" }
 
 # ---------- 2. 用便携 Python 建表 + 种子（init_db 已做，这里兜底幂等） ----------
@@ -70,7 +71,10 @@ Push-Location $BackendDir
 try {
     & $Python -m alembic upgrade head
     if ($LASTEXITCODE -ne 0) { throw "迁移失败" }
-    & $Python -m app.seed
+    # 便携 Python 的 embeddable 特性：-m 不会把当前目录加入 sys.path，须用 -c + sys.path.insert 导入 app
+    $PyDir = $BackendDir.Replace('\', '/')
+    & $Python -c "import sys; sys.path.insert(0, r'$PyDir'); from app.seed import run; sys.exit(run())"
+    if ($LASTEXITCODE -ne 0) { throw "种子数据写入失败" }
 } finally { Pop-Location }
 
 # ---------- 3. NSSM 注册 Windows 服务 ----------
