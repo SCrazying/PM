@@ -2,11 +2,13 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.responses import ok, page_result
+from app.models.project import ProjectNode
 from app.schemas.project import MemberIn, ProjectCreate, ProjectOut, ProjectUpdate
 from app.services.audit_service import record_audit
 from app.services.project_service import ProjectService
@@ -46,10 +48,17 @@ def get_project(project_id: int, user: dict = Depends(get_current_user), db: Ses
     out["members"] = svc.list_members(project_id)
     out["role_assignments"] = svc.list_role_assignments(project_id)
     subs = svc.subnodes_map(project_id)
+    # 全部顶层节点（含停用，供编辑勾选/重新启用；前端展示时过滤 is_deleted）
+    all_nodes = db.execute(
+        select(ProjectNode).where(
+            ProjectNode.project_id == project_id, ProjectNode.parent_id.is_(None),
+        ).order_by(ProjectNode.sequence)
+    ).scalars().all()
     out["nodes"] = [
         {"id": n.id, "node_key": n.node_key, "name": n.name, "sequence": n.sequence, "status": n.status,
          "planned_start": n.planned_start, "planned_end": n.planned_end,
          "actual_start": n.actual_start, "actual_end": n.actual_end,
+         "is_deleted": n.is_deleted,
          "overdue": bool(n.status != "passed" and n.planned_end and n.planned_end < date.today()),
          "subnodes": [
              {"id": s.id, "name": s.name, "status": s.status, "planned_end": s.planned_end,
@@ -57,7 +66,7 @@ def get_project(project_id: int, user: dict = Depends(get_current_user), db: Ses
               "overdue": bool(s.status != "done" and s.planned_end and s.planned_end < date.today())}
              for s in subs.get(n.id, [])
          ]}
-        for n in svc.list_nodes(project_id)
+        for n in all_nodes
     ]
     return ok(out)
 

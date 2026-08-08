@@ -64,6 +64,7 @@ class ProjectUpdate(BaseModel):
     description: Optional[str] = None
     role_assignments: Optional[RoleAssignments] = None
     node_deadlines: Optional[List[NodeDeadlineIn]] = None
+    node_enabled_ids: Optional[List[int]] = None   # 启用的节点 id（未列出则停用，列出则启用/恢复）
 
 
 class ProjectOut(BaseModel):

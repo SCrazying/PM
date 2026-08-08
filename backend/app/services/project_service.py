@@ -178,6 +178,7 @@ class ProjectService:
         data = body.model_dump(exclude_none=True)
         role_assignments = data.pop("role_assignments", None)
         node_deadlines = data.pop("node_deadlines", None)
+        node_enabled_ids = data.pop("node_enabled_ids", None)
         # 负责人变更：同步成员表
         if "owner_id" in data and data["owner_id"] != project.owner_id:
             new_owner = self.db.get(User, data["owner_id"])
@@ -190,9 +191,33 @@ class ProjectService:
             self.replace_role_assignments(project.id, role_assignments)
         if node_deadlines is not None:
             self.replace_node_deadlines(project.id, node_deadlines)
+        if node_enabled_ids is not None:
+            self.apply_node_enabled(project, node_enabled_ids)
         self.db.commit()
         self.db.refresh(project)
         return project
+
+    def apply_node_enabled(self, project: Project, enabled_ids: list[int]) -> None:
+        """编辑项目时启用/停用节点：未列出的顶层节点停用，列出的启用/恢复；子节点跟随父节点。"""
+        from datetime import datetime, timezone
+        enabled_set = set(enabled_ids)
+        nodes = list(self.db.execute(
+            select(ProjectNode).where(ProjectNode.project_id == project.id)
+        ).scalars().all())
+        now = datetime.now(timezone.utc)
+        top = {n.id: n for n in nodes if n.parent_id is None}
+        for node in nodes:
+            if node.parent_id is None:
+                active = node.id in enabled_set
+                node.is_deleted = not active
+                node.deleted_at = None if active else now
+            else:
+                parent = top.get(node.parent_id)
+                parent_active = parent is not None and not parent.is_deleted
+                node.is_deleted = not parent_active
+                node.deleted_at = None if parent_active else now
+        self._refresh_current_node(project)
+        self.db.flush()
 
     def replace_node_deadlines(self, project_id: int, deadlines: list[dict]) -> None:
         """只替换项目节点的计划完成日期，不改动旧的计划开始日期。"""

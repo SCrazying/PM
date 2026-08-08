@@ -78,12 +78,15 @@
           <div class="node-tip">勾选本项目需要做的 TR 节点（默认全选）</div>
         </div>
       </el-form-item>
-      <el-form-item v-if="isEdit && editableProjectNodes.length" label="节点截止时间">
+      <el-form-item v-if="isEdit && editableProjectNodes.length" label="节点">
         <div class="node-box">
-          <div class="node-plan-title">可修改计划完成日期；历史实际完成日期不变</div>
+          <div class="node-plan-title">勾选启用节点；未勾选将停用；可修改计划完成日期</div>
           <div v-for="n in editableProjectNodes" :key="n.id" class="node-plan-row">
-            <span class="node-plan-name">{{ n.node_key }} {{ n.name }}</span>
-            <el-date-picker v-model="form.node_deadlines[n.id]" type="date" value-format="YYYY-MM-DD" placeholder="计划完成" clearable />
+            <el-checkbox v-model="form.node_ids" :value="n.id">
+              {{ n.node_key }} {{ n.name }}
+            </el-checkbox>
+            <el-date-picker v-model="form.node_deadlines[n.id]" type="date" value-format="YYYY-MM-DD" placeholder="计划完成"
+                            clearable :disabled="!form.node_ids.includes(n.id)" />
             <el-tag v-if="isDeadlineOverdue(form.node_deadlines[n.id])" size="small" type="warning">已超期</el-tag>
           </div>
         </div>
@@ -228,7 +231,9 @@ async function open(project) {
     Object.assign(form, {
       name: project.name, code: project.code, machine_model: project.machine_model,
       owner_id: project.owner_id, start_date: project.start_date, end_date: project.end_date,
-      description: project.description, template_id: null, node_ids: [], node_plans: {},
+      description: project.description, template_id: null,
+      node_ids: (project.nodes || []).filter((n) => !n.is_deleted).map((n) => n.id),  // 勾选启用节点
+      node_plans: {},
       node_deadlines: Object.fromEntries((project.nodes || []).map((node) => [node.id, node.planned_end || null])),
     })
     setRoleAssignments(project.role_assignments)
@@ -256,6 +261,7 @@ async function onSubmit() {
         name: form.name, machine_model: form.machine_model, owner_id: form.owner_id,
         start_date: form.start_date, end_date: form.end_date, description: form.description,
         role_assignments: roleAssignmentPayload(), node_deadlines: nodeDeadlinePayload(),
+        node_enabled_ids: [...form.node_ids],
       })
       ElMessage.success('已更新')
     } else {
