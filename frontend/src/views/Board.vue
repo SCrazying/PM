@@ -68,7 +68,9 @@
     <el-row :gutter="14" v-if="summary" class="dash-row">
       <el-col :span="24">
         <div class="dash-section">
-          <div class="dash-h">昨日进展 / 今日计划缺报（{{ fmtTarget(summary.report_target_date) }}）</div>
+          <div class="dash-h">昨日进展 / 今日计划缺报（{{ fmtTarget(summary.report_target_date) }}）
+            <span class="dash-h-sub">不参与早会点名的人员：系统管理 → 看板提醒</span>
+          </div>
           <el-row :gutter="14">
             <el-col :span="12">
               <div class="dash-sub-h">未更新昨日进展（{{ summary.missing_progress.length }}）</div>
@@ -266,6 +268,7 @@ async function onColDrop(toKey) {
 
 .dash-section { background: var(--pm-card); border-radius: var(--pm-radius); box-shadow: var(--pm-shadow); padding: 14px 16px; margin-bottom: 14px; }
 .dash-h { font-weight: 700; font-size: 14px; margin-bottom: 10px; color: var(--pm-text); }
+.dash-h-sub { font-weight: 400; font-size: 11.5px; color: var(--pm-text-3); margin-left: 8px; }
 .dash-row { margin-bottom: 0; }
 
 .dist-bar { display: flex; height: 14px; border-radius: 8px; overflow: hidden; background: var(--pm-st-notstarted-bg); }

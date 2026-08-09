@@ -1,10 +1,11 @@
 """看板引擎：可视化看板统计 + 状态分桶。（M7：健康度下线，看板列=手动状态）"""
+import json
 from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.misc import Progress
+from app.models.misc import Config, Progress
 from app.models.project import ACTIVE_PROJECT_STATUSES, Project, ProjectMember, ProjectNode, Task
 from app.models.user import User
 
@@ -122,6 +123,16 @@ class BoardService:
         if uid_list:
             name_map = {u.id: u.display_name for u in self.db.execute(
                 select(User).where(User.id.in_(uid_list))).scalars().all()}
+
+        # 报工提醒排除人员（系统管理可配置：部分同事不参与早会点名，看板缺报面板不提示）
+        exempt_cfg = self.db.get(Config, "board.report_exempt_users")
+        exempt_ids = set()
+        if exempt_cfg and exempt_cfg.value:
+            try:
+                exempt_ids = {int(x) for x in json.loads(exempt_cfg.value) if isinstance(x, int) or str(x).isdigit()}
+            except (ValueError, TypeError):
+                exempt_ids = set()
+        user_projects = {uid: projs for uid, projs in user_projects.items() if uid not in exempt_ids}
 
         def _mk(uid, projs):
             return {"user_id": uid, "display_name": name_map.get(uid), "projects": [

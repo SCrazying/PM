@@ -12,6 +12,8 @@
       <el-tab-pane label="Excel 导入" name="import"><ImportAdmin /></el-tab-pane>
       <!-- 系统配置 -->
       <el-tab-pane label="系统配置" name="config"><ConfigAdmin /></el-tab-pane>
+      <!-- 看板提醒（报工缺报排除） -->
+      <el-tab-pane label="看板提醒" name="board"><BoardReminderAdmin /></el-tab-pane>
       <!-- 备份 -->
       <el-tab-pane label="数据备份" name="backup"><BackupAdmin /></el-tab-pane>
       <!-- 回收站 -->
@@ -29,6 +31,7 @@ import ConfigAdmin from '../components/admin/ConfigAdmin.vue'
 import BackupAdmin from '../components/admin/BackupAdmin.vue'
 import ImportAdmin from '../components/admin/ImportAdmin.vue'
 import RecycleBinAdmin from '../components/admin/RecycleBinAdmin.vue'
+import BoardReminderAdmin from '../components/admin/BoardReminderAdmin.vue'
 
 const tab = ref('users')
 </script>
