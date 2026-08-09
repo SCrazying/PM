@@ -35,7 +35,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="visible" title="新建模板" width="640px">
+    <el-dialog v-model="visible" title="新建模板" width="720px" :close-on-click-modal="false">
       <el-form label-width="80px">
         <el-form-item label="模板名" required><el-input v-model="form.name" /></el-form-item>
         <el-form-item label="描述"><el-input v-model="form.description" /></el-form-item>

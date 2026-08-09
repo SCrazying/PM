@@ -163,6 +163,7 @@
                 <span v-if="g.done" class="gi-date">{{ g.done_at }}</span>
                 <span v-else-if="g.overdue" class="gi-date gi-overdue">超期 {{ g.deadline }}</span>
                 <span v-else-if="g.deadline" class="gi-date">{{ g.deadline }}</span>
+                <span v-if="g.user_name" class="gi-owner">{{ g.user_name }}</span>
                 <span class="gi-goal">{{ g.goal }}</span>
               </div>
             </div>
@@ -454,6 +455,7 @@ onMounted(async () => {
 .goal-item .el-icon { color: var(--pm-primary); flex-shrink: 0; }
 .goal-item.done .el-icon { color: var(--pm-success); }
 .gi-goal { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
+.gi-owner { color: var(--pm-primary); font-size: 12px; font-weight: 600; flex-shrink: 0; }
 .gi-date { color: var(--pm-text-3); font-size: 11.5px; white-space: nowrap; }
 .gi-overdue { color: var(--pm-danger); font-weight: 600; }
 .sub-inline { cursor: pointer; }

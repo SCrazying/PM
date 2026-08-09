@@ -265,6 +265,22 @@ CREATE TABLE project_weekly_goal (
 CREATE UNIQUE INDEX ux_weekly_goal ON project_weekly_goal(project_id, week_start) WHERE NOT is_deleted;
 COMMENT ON TABLE project_weekly_goal IS '项目周目标（周报头部）';
 
+CREATE TABLE weekly_goal_item (
+    id          BIGSERIAL PRIMARY KEY,
+    project_id  BIGINT NOT NULL REFERENCES project(id) ON DELETE RESTRICT,
+    week_start  DATE NOT NULL,                             -- 本周起始日（应用层按周界规整）
+    goal        VARCHAR(255) NOT NULL,
+    deadline    DATE,                                      -- 目标截止时间
+    user_id     BIGINT REFERENCES "user"(id) ON DELETE RESTRICT,  -- 目标负责人（项目成员）
+    done        BOOLEAN NOT NULL DEFAULT FALSE,
+    done_at     DATE,                                      -- 完成日期
+    sequence    INTEGER NOT NULL DEFAULT 0,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX ix_weekly_goal_item_project ON weekly_goal_item(project_id, week_start);
+COMMENT ON TABLE weekly_goal_item IS '项目周目标条目（周目标明细，可绑定负责人）';
+
 -- ---------------------------------------------------------------------
 -- 7. 附件
 -- ---------------------------------------------------------------------

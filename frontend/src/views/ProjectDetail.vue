@@ -136,6 +136,7 @@
             <div v-for="g in goalItems" :key="g.id" class="goal-item" :class="{ done: g.done }" @click="onToggleGoalItem(g)"
                  :title="`${g.goal}（点击切换完成）`">
               <el-icon :size="13"><Select v-if="g.done" /><CircleCheck v-else /></el-icon>
+              <span v-if="g.user_name" class="gi-owner">{{ g.user_name }}</span>
               <span class="gi-goal">{{ g.goal }}</span>
               <span v-if="g.done" class="gi-date">{{ g.done_at }}</span>
               <span v-else-if="g.overdue" class="gi-date gi-overdue">超期 {{ g.deadline }}</span>
@@ -180,7 +181,7 @@
     </el-row>
 
     <!-- 任务弹窗 -->
-    <el-dialog v-model="taskVisible" :title="taskForm.id ? '编辑任务' : '新建任务'" width="480px">
+    <el-dialog v-model="taskVisible" :title="taskForm.id ? '编辑任务' : '新建任务'" width="560px" :close-on-click-modal="false">
       <el-form :model="taskForm" label-width="80px">
         <el-form-item label="任务" required><el-input v-model="taskForm.title" /></el-form-item>
         <el-form-item label="指派人">
@@ -199,7 +200,7 @@
     </el-dialog>
 
     <!-- 子节点弹窗 -->
-    <el-dialog v-model="subnodeVisible" :title="subnodeForm.id ? '编辑子节点' : '添加子节点'" width="440px">
+    <el-dialog v-model="subnodeVisible" :title="subnodeForm.id ? '编辑子节点' : '添加子节点'" width="520px" :close-on-click-modal="false">
       <el-form :model="subnodeForm" label-width="80px">
         <el-form-item label="名称" required><el-input v-model="subnodeForm.name" placeholder="子节点名称" /></el-form-item>
         <el-form-item label="截止时间">
@@ -213,7 +214,7 @@
     </el-dialog>
 
     <!-- 评审弹窗 -->
-    <el-dialog v-model="reviewVisible" title="节点评审" width="440px">
+    <el-dialog v-model="reviewVisible" title="节点评审" width="540px" :close-on-click-modal="false">
       <el-form label-width="80px">
         <el-form-item label="节点"><b>{{ currentNode?.node_key }} {{ currentNode?.name }}</b></el-form-item>
         <el-form-item label="结论">
@@ -234,10 +235,15 @@
     </el-dialog>
 
     <!-- 周目标条目弹窗 -->
-    <el-dialog v-model="goalVisible" :title="goalForm.id ? '编辑目标条目' : '添加目标条目'" width="440px">
+    <el-dialog v-model="goalVisible" :title="goalForm.id ? '编辑目标条目' : '添加目标条目'" width="540px" :close-on-click-modal="false">
       <el-form label-width="80px">
         <el-form-item label="目标" required>
           <el-input v-model="goalForm.goal" type="textarea" :rows="2" placeholder="本周目标条目" />
+        </el-form-item>
+        <el-form-item label="负责人">
+          <el-select v-model="goalForm.user_id" clearable filterable placeholder="选择项目成员（可不选）" style="width:100%">
+            <el-option v-for="m in members" :key="m.user_id" :label="m.display_name" :value="m.user_id" />
+          </el-select>
         </el-form-item>
         <el-form-item label="截止时间">
           <el-date-picker v-model="goalForm.deadline" type="date" value-format="YYYY-MM-DD" style="width:100%" />
@@ -250,7 +256,7 @@
     </el-dialog>
 
     <!-- 添加成员弹窗 -->
-    <el-dialog v-model="memberVisible" title="添加成员" width="420px">
+    <el-dialog v-model="memberVisible" title="添加成员" width="520px" :close-on-click-modal="false">
       <el-form label-width="80px">
         <el-form-item label="成员">
           <el-select v-model="memberForm.user_id" filterable style="width:100%">
@@ -266,7 +272,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="progressVisible" title="编辑进展" width="520px">
+    <el-dialog v-model="progressVisible" title="编辑进展" width="620px" :close-on-click-modal="false">
       <el-form :model="progressForm" label-width="80px">
         <el-form-item label="日期"><span>{{ progressForm.progress_date }}</span></el-form-item>
         <el-form-item label="所属节点"><span>{{ progressForm.node_name || '项目级' }}</span></el-form-item>
@@ -336,7 +342,7 @@ const memberForm = reactive({ user_id: null, project_role: '', is_invested: true
 const reviewVisible = ref(false)
 const reviewForm = reactive({ conclusion: 'pass', comment: '' })
 const goalVisible = ref(false)
-const goalForm = reactive({ id: null, goal: '', deadline: null })
+const goalForm = reactive({ id: null, goal: '', deadline: null, user_id: null })
 const editFormRef = ref()
 
 const ownerName = computed(() => userName(project.value?.owner_id))
@@ -394,15 +400,16 @@ async function loadGoal() {
 
 // ---------- M7 周目标条目 ----------
 function openGoalItem(g) {
-  if (g) Object.assign(goalForm, { id: g.id, goal: g.goal, deadline: g.deadline })
-  else Object.assign(goalForm, { id: null, goal: '', deadline: null })
+  if (g) Object.assign(goalForm, { id: g.id, goal: g.goal, deadline: g.deadline, user_id: g.user_id ?? null })
+  else Object.assign(goalForm, { id: null, goal: '', deadline: null, user_id: null })
   goalVisible.value = true
 }
 
 async function saveGoal() {
   if (!goalForm.goal.trim()) { ElMessage.warning('请输入目标内容'); return }
-  if (goalForm.id) await updateWeeklyGoalItem(goalForm.id, goalForm)
-  else await addWeeklyGoalItem(pid, { week_start: new Date().toISOString().slice(0, 10), goal: goalForm.goal, deadline: goalForm.deadline })
+  const payload = { goal: goalForm.goal, deadline: goalForm.deadline, user_id: goalForm.user_id || null }
+  if (goalForm.id) await updateWeeklyGoalItem(goalForm.id, payload)
+  else await addWeeklyGoalItem(pid, { week_start: new Date().toISOString().slice(0, 10), ...payload })
   ElMessage.success('已保存')
   goalVisible.value = false
   loadGoal()
@@ -581,6 +588,7 @@ onMounted(loadAll)
 .goal-item .el-icon { color: var(--pm-primary); flex-shrink: 0; }
 .goal-item.done .el-icon { color: var(--pm-success); }
 .gi-goal { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
+.gi-owner { color: var(--pm-primary); font-size: 12px; font-weight: 600; flex-shrink: 0; }
 .gi-date { color: var(--pm-text-3); font-size: 11.5px; white-space: nowrap; }
 .gi-overdue { color: var(--pm-danger); font-weight: 600; }
 .gi-ops { display: flex; gap: 2px; flex-shrink: 0; }

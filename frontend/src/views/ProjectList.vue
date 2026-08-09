@@ -21,8 +21,10 @@
           <el-link type="primary" @click="goDetail(row)">{{ row.name }}</el-link>
         </template>
       </el-table-column>
-      <el-table-column prop="description" label="项目描述" min-width="220" sortable="custom" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.description || '—' }}</template>
+      <el-table-column prop="description" label="项目描述" min-width="240" sortable="custom">
+        <template #default="{ row }">
+          <div class="desc-cell">{{ row.description || '—' }}</div>
+        </template>
       </el-table-column>
       <el-table-column prop="machine_model" label="机型" width="96" sortable="custom" />
       <el-table-column label="当前节点" width="150">
@@ -173,4 +175,5 @@ onMounted(async () => {
 .page-pager { margin-top: 16px; justify-content: flex-end; }
 .status-chip { cursor: pointer; }
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.desc-cell { white-space: pre-wrap; word-break: break-word; line-height: 1.5; color: var(--pm-text-2); font-size: 12.5px; }
 </style>

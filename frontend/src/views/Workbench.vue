@@ -104,7 +104,7 @@
       </el-col>
     </el-row>
 
-    <el-dialog v-model="progressEditVisible" title="编辑进展" width="520px">
+    <el-dialog v-model="progressEditVisible" title="编辑进展" width="620px" :close-on-click-modal="false">
       <el-form :model="progressEditForm" label-width="80px">
         <el-form-item label="日期"><span>{{ progressEditForm.progress_date }}</span></el-form-item>
         <el-form-item label="所属节点"><span>{{ progressEditForm.node_name || '项目级' }}</span></el-form-item>

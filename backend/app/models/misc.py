@@ -42,13 +42,15 @@ class ProjectWeeklyGoal(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
 
 
 class WeeklyGoalItem(IdMixin, TimestampMixin, Base):
-    """项目周目标条目：goal + 截止时间 + 完成状态（周会视图逐条点击完成）。"""
+    """项目周目标条目：goal + 截止时间 + 完成状态（周会视图逐条点击完成）。
+    user_id：目标负责人（参与项目的成员，便于目标与任务/人绑定）。"""
     __tablename__ = "weekly_goal_item"
 
     project_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("project.id", ondelete="RESTRICT"), nullable=False)
     week_start: Mapped[date] = mapped_column(Date, nullable=False)
     goal: Mapped[str] = mapped_column(String(255), nullable=False)
     deadline: Mapped[date | None] = mapped_column(Date)
+    user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("user.id", ondelete="RESTRICT"))
     done: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     done_at: Mapped[date | None] = mapped_column(Date)
     sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

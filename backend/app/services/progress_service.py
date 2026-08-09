@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.responses import BizException, NotFoundError
 from app.models.misc import Progress, ProgressTaskLink, ProjectWeeklyGoal, WeeklyGoalItem
-from app.models.project import ACTIVE_PROJECT_STATUSES, Project, ProjectNode, Task
+from app.models.project import ACTIVE_PROJECT_STATUSES, Project, ProjectMember, ProjectNode, Task
 from app.models.user import User
 from app.schemas.progress import ProgressCreate, ProgressUpdate
 from app.services.project_service import ProjectService
@@ -247,29 +247,44 @@ class ProgressService:
                 WeeklyGoalItem.project_id == project_id, WeeklyGoalItem.week_start == ws,
             ).order_by(WeeklyGoalItem.sequence, WeeklyGoalItem.id)
         ).scalars().all()
+        user_ids = {r.user_id for r in rows if r.user_id}
+        names = {}
+        if user_ids:
+            names = {u.id: u.display_name for u in self.db.execute(
+                select(User).where(User.id.in_(user_ids))).scalars().all()}
         return [{
             "id": r.id, "goal": r.goal, "deadline": r.deadline,
             "done": r.done, "done_at": r.done_at, "sequence": r.sequence,
+            "user_id": r.user_id, "user_name": names.get(r.user_id),
             "overdue": bool(not r.done and r.deadline and r.deadline < date.today()),
         } for r in rows]
 
-    def add_weekly_goal_item(self, project_id: int, week_start, goal: str, deadline, user: dict) -> WeeklyGoalItem:
+    def add_weekly_goal_item(self, project_id: int, week_start, goal: str, deadline, user_id, user: dict) -> WeeklyGoalItem:
         project = self.ps.get_project(project_id)
         self.ps.check_owner(project, user)
         if isinstance(week_start, str):
             week_start = date.fromisoformat(week_start)
         ws = self.week_start_of(week_start)
+        if user_id:
+            member = self.db.execute(
+                select(ProjectMember).where(
+                    ProjectMember.project_id == project_id, ProjectMember.user_id == user_id,
+                    ProjectMember.is_deleted.is_(False))
+            ).scalar_one_or_none()
+            if not member:
+                raise NotFoundError("所选成员不在本项目成员中")
         seq = self.db.execute(
             select(func.count()).select_from(WeeklyGoalItem).where(
                 WeeklyGoalItem.project_id == project_id, WeeklyGoalItem.week_start == ws)
         ).scalar_one() + 1
-        item = WeeklyGoalItem(project_id=project_id, week_start=ws, goal=goal, deadline=deadline, sequence=seq)
+        item = WeeklyGoalItem(project_id=project_id, week_start=ws, goal=goal, deadline=deadline,
+                              user_id=user_id, sequence=seq)
         self.db.add(item)
         self.db.commit()
         self.db.refresh(item)
         return item
 
-    def update_weekly_goal_item(self, item_id: int, goal, deadline, user: dict) -> WeeklyGoalItem:
+    def update_weekly_goal_item(self, item_id: int, goal, deadline, user_id, user: dict) -> WeeklyGoalItem:
         item = self.db.get(WeeklyGoalItem, item_id)
         if not item:
             raise NotFoundError("周目标条目不存在")
@@ -278,6 +293,15 @@ class ProgressService:
         if goal is not None:
             item.goal = goal
         item.deadline = deadline
+        if user_id:
+            member = self.db.execute(
+                select(ProjectMember).where(
+                    ProjectMember.project_id == item.project_id, ProjectMember.user_id == user_id,
+                    ProjectMember.is_deleted.is_(False))
+            ).scalar_one_or_none()
+            if not member:
+                raise NotFoundError("所选成员不在本项目成员中")
+        item.user_id = user_id
         self.db.commit()
         self.db.refresh(item)
         return item

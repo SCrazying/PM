@@ -84,13 +84,15 @@ def add_weekly_goal_item(project_id: int, body: dict, user: dict = Depends(get_c
         from app.core.responses import BizException
         raise BizException("目标内容不能为空")
     item = ProgressService(db).add_weekly_goal_item(
-        project_id, body.get("week_start") or date.today(), goal, body.get("deadline"), user)
+        project_id, body.get("week_start") or date.today(), goal, body.get("deadline"),
+        body.get("user_id"), user)
     return ok({"id": item.id}, message="已添加")
 
 
 @router.patch("/weekly-goal-items/{item_id}")
 def update_weekly_goal_item(item_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    item = ProgressService(db).update_weekly_goal_item(item_id, body.get("goal"), body.get("deadline"), user)
+    item = ProgressService(db).update_weekly_goal_item(
+        item_id, body.get("goal"), body.get("deadline"), body.get("user_id"), user)
     return ok({"id": item.id}, message="已更新")
 
 

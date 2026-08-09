@@ -166,15 +166,22 @@ class ReportService:
                     subnodes = node_subnodes[-1]["subnodes"]
 
         # 周目标条目（本周）
-        goal_items = [{
-            "id": g.id, "goal": g.goal, "deadline": g.deadline,
-            "done": g.done, "done_at": g.done_at,
-            "overdue": bool(not g.done and g.deadline and g.deadline < date.today()),
-        } for g in self.db.execute(
+        goal_rows = self.db.execute(
             select(WeeklyGoalItem).where(
                 WeeklyGoalItem.project_id == project_id, WeeklyGoalItem.week_start == ws,
             ).order_by(WeeklyGoalItem.sequence, WeeklyGoalItem.id)
-        ).scalars().all()]
+        ).scalars().all()
+        goal_user_ids = {g.user_id for g in goal_rows if g.user_id}
+        goal_names = {}
+        if goal_user_ids:
+            goal_names = {u.id: u.display_name for u in self.db.execute(
+                select(User).where(User.id.in_(goal_user_ids))).scalars().all()}
+        goal_items = [{
+            "id": g.id, "goal": g.goal, "deadline": g.deadline,
+            "done": g.done, "done_at": g.done_at,
+            "user_id": g.user_id, "user_name": goal_names.get(g.user_id),
+            "overdue": bool(not g.done and g.deadline and g.deadline < date.today()),
+        } for g in goal_rows]
 
         return {
             "project": {"id": project.id, "name": project.name, "code": project.code,
@@ -267,18 +274,19 @@ class ReportService:
                 return "\n".join(lines) or "无"
 
             def fmt_goals(items, legacy):
-                """周目标列：✓ 已完成条目；无条目时回落历史自由文本"""
+                """周目标列：✓ 已完成条目（含负责人）；无条目时回落历史自由文本"""
                 if items:
                     lines = []
                     for g in items:
+                        name = f"{g['user_name']}：" if g.get("user_name") else ""
                         if g["done"]:
-                            lines.append(f"✓ {g['done_at'] or ''} {g['goal']}".strip())
+                            lines.append(f"✓ {g['done_at'] or ''} {name}{g['goal']}".strip())
                         elif g["overdue"]:
-                            lines.append(f"○ {g['goal']} 超期 {g['deadline']}")
+                            lines.append(f"○ {name}{g['goal']} 超期 {g['deadline']}")
                         elif g["deadline"]:
-                            lines.append(f"○ {g['goal']} {g['deadline']}")
+                            lines.append(f"○ {name}{g['goal']} {g['deadline']}")
                         else:
-                            lines.append(f"○ {g['goal']}")
+                            lines.append(f"○ {name}{g['goal']}")
                     return "\n".join(lines)
                 return legacy or "（未设周目标）"
 
