@@ -10,6 +10,7 @@
           <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
         </el-select>
         <el-button type="primary" @click="load">查询</el-button>
+        <el-button @click="onReset">重置</el-button>
       </div>
       <el-button type="success" @click="openCreate"><el-icon style="margin-right:4px"><Plus /></el-icon>新建项目</el-button>
     </div>
@@ -79,7 +80,14 @@ const rows = ref([])
 const total = ref(0)
 const nodeCache = ref({})
 const machineOptions = ref([])
-const query = useViewFilterStore().projectList
+const viewFilters = useViewFilterStore()
+const query = viewFilters.projectList
+
+// 重置筛选回默认值（关键词/状态/机型/排序/页码）
+function onReset() {
+  viewFilters.reset('projectList')
+  load()
+}
 
 // 项目状态：手动配置（未开始/进行中/延期/已完成/暂停），已完成即终态
 const statusOptions = [

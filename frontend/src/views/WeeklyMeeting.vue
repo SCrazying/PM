@@ -27,6 +27,7 @@
             <el-option v-for="r in roleFilterOptions" :key="r.value" :label="r.label" :value="r.value" />
           </el-select>
         </template>
+        <el-button @click="onReset">重置</el-button>
         <div style="flex:1"></div>
         <el-dropdown @command="downloadLedger">
           <el-button type="success" :loading="exporting">
@@ -233,6 +234,12 @@ const router = useRouter()
 const viewFilters = useViewFilterStore()
 const weekStart = computed({ get: () => viewFilters.weekly.weekStart, set: (v) => { viewFilters.weekly.weekStart = v } })
 const view = computed({ get: () => viewFilters.weekly.view, set: (v) => { viewFilters.weekly.view = v } })
+
+// 重置筛选回默认值（机型/状态/角色/按人/周次回本周）
+function onReset() {
+  viewFilters.reset('weekly')
+  load()
+}
 const loading = ref(false)
 const projectReports = ref([])
 const filterMachine = computed({ get: () => viewFilters.weekly.filterMachine, set: (v) => { viewFilters.weekly.filterMachine = v } })
