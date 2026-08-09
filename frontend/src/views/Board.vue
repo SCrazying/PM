@@ -179,6 +179,7 @@ async function load() {
     summary.value = await getBoardSummary()
   } finally { loading.value = false }
 }
+onMounted(load)
 function goDetail(p) { router.push({ name: 'project-detail', params: { id: p.id } }) }
 
 // ---------- 拖拽换状态 ----------
