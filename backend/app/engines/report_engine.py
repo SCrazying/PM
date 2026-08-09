@@ -203,51 +203,136 @@ class ReportService:
 
     # ---------- 项目台账 Excel 导出（M5） ----------
     def export_ledger_xlsx(self, week_start: date, scope: str = "weekly") -> BytesIO:
-        """按成员一行导出固定 7 列项目台账。
-        scope=weekly：本周台账（任务/进展仅本周，周目标取本周）；
-        scope=all：项目台账（任务/进展为项目全部周合集，周目标取最近一周）。"""
+        """导出项目台账 Excel。
+        scope=weekly：本周台账，与周会视图「按项目」视图列结构一致（每项目一行）；
+        scope=all：项目台账（每周任务合集），保持按成员一行的历史格式。"""
         ws_start, ws_end = self._week_range(week_start)
         wb = Workbook()
         ws = wb.active
-        ws.title = "项目台账"
-        task_header = "本周任务" if scope == "weekly" else "项目任务"
-        headers = ["机型", "项目", "是否投入", "项目角色", "关键节点", "周目标", task_header]
-        widths = [14, 24, 12, 22, 18, 30, 52]
         header_fill = PatternFill("solid", fgColor="4F6EF7")
         header_font = Font(bold=True, color="FFFFFF", size=11)
         thin = Side(style="thin", color="D9E0EA")
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
-        for col, (header, width) in enumerate(zip(headers, widths), start=1):
-            cell = ws.cell(row=1, column=col, value=header)
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            cell.border = border
-            ws.column_dimensions[get_column_letter(col)].width = width
-        ws.row_dimensions[1].height = 28
-        ws.freeze_panes = "A2"
-        ws.auto_filter.ref = "A1:G1"
+
+        def _header(headers, widths, title):
+            ws.title = title
+            for col, (header, width) in enumerate(zip(headers, widths), start=1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                cell.border = border
+                ws.column_dimensions[get_column_letter(col)].width = width
+            ws.row_dimensions[1].height = 28
+            ws.freeze_panes = "A2"
+            ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}1"
 
         projects = self.db.execute(
             select(Project).where(Project.is_deleted.is_(False)).order_by(Project.name)
         ).scalars().all()
+
+        # ---------- 本周台账：与周会视图「按项目」视图一致，每项目一行 ----------
+        if scope == "weekly":
+            status_labels = {"not_started": "未开始", "in_progress": "进行中", "delayed": "延期",
+                             "completed": "已完成", "suspended": "暂停"}
+            headers = ["机型", "项目名称", "项目描述", "状态", "项目角色", "当前节点", "子节点", "周目标", "每日进展"]
+            widths = [14, 22, 26, 10, 24, 26, 30, 32, 50]
+            _header(headers, widths, "本周台账")
+
+            def short(d):
+                return d.isoformat()[5:] if d else ""
+
+            def fmt_nodes(nodes):
+                """当前节点列：未通过的一级节点，TR3 08-06 超期"""
+                lines = []
+                for n in nodes:
+                    if n["status"] == "passed":
+                        continue
+                    end = short(n["planned_end"]) or "—"
+                    lines.append(f"{n['node_key']} {end}{' 超期' if n['overdue'] else ''}")
+                return "\n".join(lines) or "未设置"
+
+            def fmt_subnodes(subnodes):
+                """子节点列：✓ 已完成 / ○ 待办，含日期与延期标记"""
+                lines = []
+                for s in subnodes:
+                    if s["status"] == "done":
+                        lines.append(f"✓ {short(s['actual_end'])} {s['name']}".strip())
+                    elif s["overdue"]:
+                        lines.append(f"○ {short(s['planned_end'])} 延期 {s['name']}")
+                    elif s["planned_end"]:
+                        lines.append(f"○ {short(s['planned_end'])} {s['name']}")
+                    else:
+                        lines.append(f"○ {s['name']}")
+                return "\n".join(lines) or "无"
+
+            def fmt_goals(items, legacy):
+                """周目标列：✓ 已完成条目；无条目时回落历史自由文本"""
+                if items:
+                    lines = []
+                    for g in items:
+                        if g["done"]:
+                            lines.append(f"✓ {g['done_at'] or ''} {g['goal']}".strip())
+                        elif g["overdue"]:
+                            lines.append(f"○ {g['goal']} 超期 {g['deadline']}")
+                        elif g["deadline"]:
+                            lines.append(f"○ {g['goal']} {g['deadline']}")
+                        else:
+                            lines.append(f"○ {g['goal']}")
+                    return "\n".join(lines)
+                return legacy or "（未设周目标）"
+
+            def fmt_daily(daily):
+                """每日进展列：日期 姓名：进展（风险），与周会视图一致"""
+                lines = []
+                for d in sorted(daily.keys(), reverse=True):
+                    for it in daily[d]:
+                        risk = "（风险）" if it["risk"] and not it["risk_resolved"] else ""
+                        lines.append(f"{d[5:]} {it['author']}：{it['today_work']}{risk}")
+                return "\n".join(lines) or "无"
+
+            row_no = 2
+            for project in projects:
+                data = self.project_weekly(project.id, ws_start)
+                prj = data["project"]
+                values = [
+                    prj["machine_model"] or "",
+                    prj["name"],
+                    prj["description"] or "",
+                    status_labels.get(prj["status"], prj["status"]),
+                    prj["project_roles"] or "",
+                    fmt_nodes(prj["nodes"]),
+                    fmt_subnodes(data["subnodes"]),
+                    fmt_goals(data["weekly_goal_items"], data["weekly_goal"]),
+                    fmt_daily(data["daily"]),
+                ]
+                for col, value in enumerate(values, start=1):
+                    cell = ws.cell(row=row_no, column=col, value=value)
+                    cell.alignment = Alignment(vertical="top", wrap_text=True)
+                    cell.border = border
+                line_count = max((str(v).count("\n") + 1 for v in values), default=1)
+                ws.row_dimensions[row_no].height = min(180, max(42, 16 * line_count))
+                row_no += 1
+            output = BytesIO()
+            wb.save(output)
+            output.seek(0)
+            return output
+
+        # ---------- 项目台账（每周任务合集）：按成员一行 ----------
+        ws.title = "项目台账"
+        task_header = "项目任务"
+        headers = ["机型", "项目", "是否投入", "项目角色", "关键节点", "周目标", task_header]
+        widths = [14, 24, 12, 22, 18, 30, 52]
+        _header(headers, widths, "项目台账")
         row_no = 2
         for project in projects:
             current = self.db.get(ProjectNode, project.current_node_id) if project.current_node_id else None
-            if scope == "all":
-                # 最近一周目标
-                goal = self.db.execute(
-                    select(ProjectWeeklyGoal).where(
-                        ProjectWeeklyGoal.project_id == project.id,
-                        ProjectWeeklyGoal.is_deleted.is_(False),
-                    ).order_by(ProjectWeeklyGoal.week_start.desc())
-                ).scalars().first()
-            else:
-                goal = self.db.execute(select(ProjectWeeklyGoal).where(
+            goal = self.db.execute(
+                select(ProjectWeeklyGoal).where(
                     ProjectWeeklyGoal.project_id == project.id,
-                    ProjectWeeklyGoal.week_start == ws_start,
                     ProjectWeeklyGoal.is_deleted.is_(False),
-                )).scalar_one_or_none()
+                ).order_by(ProjectWeeklyGoal.week_start.desc())
+            ).scalars().first()
             members = self.db.execute(
                 select(ProjectMember, User.display_name).join(User, User.id == ProjectMember.user_id).where(
                     ProjectMember.project_id == project.id,
@@ -267,13 +352,12 @@ class ReportService:
                         Task.is_deleted.is_(False),
                     )).scalars().all()
                     member_tasks = [f"{'✓' if t.status == 'done' else '○'} {t.title}" for t in tasks]
-                    pq = select(Progress).where(
-                        Progress.project_id == project.id, Progress.author_id == member.user_id,
-                        Progress.is_deleted.is_(False),
-                    )
-                    if scope == "weekly":
-                        pq = pq.where(Progress.progress_date >= ws_start, Progress.progress_date <= ws_end)
-                    progresses = self.db.execute(pq.order_by(Progress.progress_date)).scalars().all()
+                    progresses = self.db.execute(
+                        select(Progress).where(
+                            Progress.project_id == project.id, Progress.author_id == member.user_id,
+                            Progress.is_deleted.is_(False),
+                        ).order_by(Progress.progress_date)
+                    ).scalars().all()
                     member_progress = [f"[{p.progress_date}] {p.today_work}" for p in progresses]
                 task_text = "\n".join(member_tasks + member_progress)
                 values = [
