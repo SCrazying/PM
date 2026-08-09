@@ -1,62 +1,65 @@
 <template>
   <div>
     <div class="pm-card toolbar-card">
-      <div class="pm-toolbar" style="margin-bottom:0">
-        <span class="pm-page-title">周会视图</span>
-        <el-date-picker v-model="weekStart" type="week" format="YYYY 第 ww 周" value-format="YYYY-MM-DD"
-                        style="width: 180px" @change="load" />
-        <el-select v-model="filterMachine" clearable filterable placeholder="按机型筛选" style="width: 150px">
-          <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
-        </el-select>
-        <template v-if="view === 'project'">
-          <el-select v-model="filterStatus" clearable placeholder="状态筛选" style="width: 130px">
-            <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
+      <div class="pm-toolbar weekly-toolbar" style="margin-bottom:0">
+        <div class="tb-left">
+          <span class="pm-page-title">周会视图</span>
+          <el-date-picker v-model="weekStart" type="week" format="YYYY 第 ww 周" value-format="YYYY-MM-DD"
+                          style="width: 180px" @change="load" />
+          <el-select v-model="filterMachine" clearable filterable placeholder="按机型筛选" style="width: 150px">
+            <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
           </el-select>
-          <el-select v-model="filterRole" clearable placeholder="角色（默认 FO/TL）" style="width: 150px">
-            <el-option v-for="r in roleFilterOptions" :key="r.value" :label="r.label" :value="r.value" />
-          </el-select>
-          <el-select v-model="filterPerson" clearable filterable placeholder="按人筛选" style="width: 130px">
-            <el-option v-for="u in memberUsers" :key="u.id" :label="u.display_name" :value="u.id" />
-          </el-select>
-        </template>
-        <template v-if="view === 'person'">
-          <el-select v-model="filterPerson" clearable filterable placeholder="按人筛选" style="width: 130px">
-            <el-option v-for="u in personUsers" :key="u.user_id" :label="u.display_name" :value="u.user_id" />
-          </el-select>
-          <el-select v-model="filterRole" clearable placeholder="角色（默认 FO/TL）" style="width: 150px">
-            <el-option v-for="r in roleFilterOptions" :key="r.value" :label="r.label" :value="r.value" />
-          </el-select>
-        </template>
-        <el-button @click="onReset">重置</el-button>
-        <el-popover v-if="view === 'project'" placement="bottom-start" :width="140" trigger="click">
-          <template #reference>
-            <el-button><el-icon style="margin-right:4px"><Setting /></el-icon>列设置</el-button>
+          <template v-if="view === 'project'">
+            <el-select v-model="filterStatus" clearable placeholder="状态筛选" style="width: 130px">
+              <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+            <el-select v-model="filterRole" clearable placeholder="角色（默认 FO/TL）" style="width: 150px">
+              <el-option v-for="r in roleFilterOptions" :key="r.value" :label="r.label" :value="r.value" />
+            </el-select>
+            <el-select v-model="filterPerson" clearable filterable placeholder="按人筛选" style="width: 130px">
+              <el-option v-for="u in memberUsers" :key="u.id" :label="u.display_name" :value="u.id" />
+            </el-select>
           </template>
-          <div class="col-settings">
-            <el-checkbox v-for="c in colOptions" :key="c.key"
-                         :model-value="visibleCols.includes(c.key)"
-                         @change="(v) => toggleCol(c.key, v)">{{ c.label }}</el-checkbox>
-            <el-divider style="margin:6px 0" />
-            <el-button size="small" type="primary" plain style="width:100%" @click="onResetCols">恢复默认</el-button>
-          </div>
-        </el-popover>
-        <div style="flex:1"></div>
-        <el-dropdown @command="downloadLedger">
-          <el-button type="success" :loading="exporting">
-            <el-icon style="margin-right:5px"><Download /></el-icon>导出台账<el-icon><ArrowDown /></el-icon>
-          </el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="weekly">导出本周台账</el-dropdown-item>
-              <el-dropdown-item command="project">导出项目台账（每周任务合集）</el-dropdown-item>
-              <el-dropdown-item command="completion">导出项目完成台账</el-dropdown-item>
-            </el-dropdown-menu>
+          <template v-if="view === 'person'">
+            <el-select v-model="filterPerson" clearable filterable placeholder="按人筛选" style="width: 130px">
+              <el-option v-for="u in personUsers" :key="u.user_id" :label="u.display_name" :value="u.user_id" />
+            </el-select>
+            <el-select v-model="filterRole" clearable placeholder="角色（默认 FO/TL）" style="width: 150px">
+              <el-option v-for="r in roleFilterOptions" :key="r.value" :label="r.label" :value="r.value" />
+            </el-select>
           </template>
-        </el-dropdown>
-        <el-radio-group v-model="view" @change="load">
-          <el-radio-button value="project">按项目</el-radio-button>
-          <el-radio-button value="person">按人</el-radio-button>
-        </el-radio-group>
+        </div>
+        <div class="tb-right">
+          <el-button @click="onReset">重置</el-button>
+          <el-popover v-if="view === 'project'" placement="bottom-start" :width="140" trigger="click">
+            <template #reference>
+              <el-button><el-icon style="margin-right:4px"><Setting /></el-icon>列设置</el-button>
+            </template>
+            <div class="col-settings">
+              <el-checkbox v-for="c in colOptions" :key="c.key"
+                           :model-value="visibleCols.includes(c.key)"
+                           @change="(v) => toggleCol(c.key, v)">{{ c.label }}</el-checkbox>
+              <el-divider style="margin:6px 0" />
+              <el-button size="small" type="primary" plain style="width:100%" @click="onResetCols">恢复默认</el-button>
+            </div>
+          </el-popover>
+          <el-dropdown @command="downloadLedger">
+            <el-button type="success" :loading="exporting">
+              <el-icon style="margin-right:5px"><Download /></el-icon>导出台账<el-icon><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="weekly">导出本周台账</el-dropdown-item>
+                <el-dropdown-item command="project">导出项目台账（每周任务合集）</el-dropdown-item>
+                <el-dropdown-item command="completion">导出项目完成台账</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <el-radio-group v-model="view" @change="load">
+            <el-radio-button value="project">按项目</el-radio-button>
+            <el-radio-button value="person">按人</el-radio-button>
+          </el-radio-group>
+        </div>
       </div>
     </div>
 
@@ -460,6 +463,10 @@ onMounted(async () => {
 
 <style scoped>
 .toolbar-card { padding: 14px 18px; margin-bottom: 14px; }
+.weekly-toolbar { justify-content: space-between; align-items: center; gap: 12px; }
+.weekly-toolbar .tb-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.weekly-toolbar .tb-right { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; flex-shrink: 0; }
+.weekly-toolbar .tb-right .el-button + .el-button { margin-left: 0; }
 .table-card { padding: 6px 18px 16px; }
 .project-name { font-weight: 700; cursor: pointer; color: var(--pm-primary); }
 .project-name:hover { text-decoration: underline; }
