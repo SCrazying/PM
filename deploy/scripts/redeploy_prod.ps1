@@ -1,4 +1,4 @@
-# PM-System 重新部署（卸载服务 → 重新部署，保留数据文件）
+﻿# PM-System 重新部署（卸载服务 → 重新部署，保留数据文件）
 # 用法：powershell -ExecutionPolicy Bypass -File redeploy_prod.ps1
 # 说明：
 #   - 先执行 uninstall_prod.ps1（-KeepData 保留上传/备份/日志，不删数据目录）
