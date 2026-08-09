@@ -64,6 +64,41 @@
       </el-col>
     </el-row>
 
+    <!-- 昨日进展 / 今日计划缺报（早会提醒） -->
+    <el-row :gutter="14" v-if="summary" class="dash-row">
+      <el-col :span="24">
+        <div class="dash-section">
+          <div class="dash-h">昨日进展 / 今日计划缺报（{{ fmtTarget(summary.report_target_date) }}）</div>
+          <el-row :gutter="14">
+            <el-col :span="12">
+              <div class="dash-sub-h">未更新昨日进展（{{ summary.missing_progress.length }}）</div>
+              <div v-if="summary.missing_progress.length" class="dash-list">
+                <div v-for="m in summary.missing_progress" :key="'pr' + m.user_id" class="dash-item no-click">
+                  <span class="pc-avatar">{{ (m.display_name || '?').slice(0, 1) }}</span>
+                  <span class="dash-name">{{ m.display_name || '—' }}</span>
+                  <span class="dash-sub" :title="m.projects.map(p => p.name).join('、')">{{ m.projects.map(p => p.name).join('、') }}</span>
+                  <el-tag size="small" type="warning" effect="plain">缺进展</el-tag>
+                </div>
+              </div>
+              <div v-else class="dash-empty">昨日进展均已更新</div>
+            </el-col>
+            <el-col :span="12">
+              <div class="dash-sub-h">未更新今日计划（{{ summary.missing_plan.length }}）</div>
+              <div v-if="summary.missing_plan.length" class="dash-list">
+                <div v-for="m in summary.missing_plan" :key="'pl' + m.user_id" class="dash-item no-click">
+                  <span class="pc-avatar">{{ (m.display_name || '?').slice(0, 1) }}</span>
+                  <span class="dash-name">{{ m.display_name || '—' }}</span>
+                  <span class="dash-sub" :title="m.projects.map(p => p.name).join('、')">{{ m.projects.map(p => p.name).join('、') }}</span>
+                  <el-tag size="small" type="danger" effect="plain">缺计划</el-tag>
+                </div>
+              </div>
+              <div v-else class="dash-empty">今日计划均已更新</div>
+            </el-col>
+          </el-row>
+        </div>
+      </el-col>
+    </el-row>
+
     <!-- 状态列看板（可拖拽换状态） -->
     <div class="board" v-loading="loading">
       <div v-for="col in columns" :key="col.key" class="board-col"
@@ -167,6 +202,9 @@ function fmtRange(p) {
   return s || e || ''
 }
 
+// 缺报日期：YYYY-MM-DD → MM-DD
+function fmtTarget(d) { return d ? String(d).slice(5) : '—' }
+
 // 仅负责人/管理员可拖拽改状态（与后端 check_owner 一致）
 const canEdit = (p) => userStore.isAdmin || p.owner_id === userStore.userInfo?.user_id
 
@@ -239,6 +277,8 @@ async function onColDrop(toKey) {
 .dash-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
 .dash-item { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; cursor: pointer; border: 1px solid var(--pm-border); background: var(--pm-bg); transition: all .15s ease; }
 .dash-item:hover { border-color: var(--pm-primary-light); background: var(--pm-primary-lighter); }
+.dash-item.no-click { cursor: default; }
+.dash-sub-h { font-weight: 600; font-size: 12.5px; color: var(--pm-text-2); margin-bottom: 8px; }
 .dash-name { font-weight: 600; font-size: 13px; flex: 0 1 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-sub { color: var(--pm-text-2); font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-date { color: var(--pm-text-3); font-size: 12px; flex-shrink: 0; }

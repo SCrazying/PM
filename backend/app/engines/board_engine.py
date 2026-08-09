@@ -13,6 +13,13 @@ class BoardService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _last_workday(self, d: date) -> date:
+        """上一个工作日（跳过周六日）：早会看板检查的是上一工作日的日报。"""
+        d = d - timedelta(days=1)
+        while d.weekday() >= 5:  # 5=周六, 6=周日
+            d -= timedelta(days=1)
+        return d
+
     # ---------- 可视化看板统计（首页） ----------
     def summary(self, user: dict) -> dict:
         """聚合统计：状态分布 / 未关闭风险 / 待关注项目（当前节点超期）/ 我的待办。"""
@@ -82,6 +89,51 @@ class BoardService:
             for p in projects if p.id in my_project_ids and p.status in ACTIVE_PROJECT_STATUSES and p.id not in filled_today
         ]
 
+        # 昨日进展 / 今日计划缺报（早会提醒）：上一工作日，在研项目成员+负责人中
+        # 未填今日进展(today_work) 的人 → missing_progress；未填明日计划(tomorrow_plan) 的人 → missing_plan
+        target = self._last_workday(today)
+        active_projects = [p for p in projects if p.status in ACTIVE_PROJECT_STATUSES]
+        active_ids = [p.id for p in active_projects]
+        proj_map = {p.id: p for p in projects}
+        user_projects = {}
+        for p in active_projects:
+            user_projects.setdefault(p.owner_id, {})[p.id] = p
+        if active_ids:
+            for m in self.db.execute(
+                select(ProjectMember).where(
+                    ProjectMember.project_id.in_(active_ids), ProjectMember.is_deleted.is_(False))
+            ).scalars().all():
+                if m.project_id in proj_map:
+                    user_projects.setdefault(m.user_id, {})[m.project_id] = proj_map[m.project_id]
+
+        report_rows = self.db.execute(
+            select(Progress).where(
+                Progress.progress_date == target, Progress.is_deleted.is_(False))
+        ).scalars().all()
+        filled_progress, filled_plan = set(), set()
+        for pr in report_rows:
+            if pr.today_work and pr.today_work.strip():
+                filled_progress.add(pr.author_id)
+            if pr.tomorrow_plan and pr.tomorrow_plan.strip():
+                filled_plan.add(pr.author_id)
+
+        uid_list = list(user_projects)
+        name_map = {}
+        if uid_list:
+            name_map = {u.id: u.display_name for u in self.db.execute(
+                select(User).where(User.id.in_(uid_list))).scalars().all()}
+
+        def _mk(uid, projs):
+            return {"user_id": uid, "display_name": name_map.get(uid), "projects": [
+                {"id": p.id, "name": p.name} for p in projs.values()]}
+
+        missing_progress = sorted(
+            (_mk(uid, projs) for uid, projs in user_projects.items() if uid not in filled_progress),
+            key=lambda x: (x["display_name"] or ""))
+        missing_plan = sorted(
+            (_mk(uid, projs) for uid, projs in user_projects.items() if uid not in filled_plan),
+            key=lambda x: (x["display_name"] or ""))
+
         return {
             "status_counts": counts,
             "active": sum(counts[s] for s in ("not_started", "in_progress", "delayed", "suspended")),
@@ -92,6 +144,10 @@ class BoardService:
             "overdue_projects": overdue_projects,
             "my_task_count": len(my_open_tasks),
             "todo_projects": todo_projects,
+            "report_target_date": target,
+            "missing_progress": missing_progress,
+            "missing_plan": missing_plan,
+            "missing_count": len(missing_progress) + len(missing_plan),
         }
 
     # ---------- 看板列 ----------
