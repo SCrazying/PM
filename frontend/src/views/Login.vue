@@ -72,7 +72,7 @@ async function onSubmit() {
 .login-wrap { display: flex; height: 100vh; }
 .login-left {
   flex: 1.2;
-  background: linear-gradient(135deg, #0c2422 0%, #10312f 45%, #0ea5a4 130%);
+  background: linear-gradient(135deg, #0b2237 0%, #0d2840 45%, #0ea5e9 135%);
   color: #fff;
   display: flex; align-items: center; justify-content: center;
   padding: 40px;
@@ -82,7 +82,7 @@ async function onSubmit() {
 /* 背景装饰光圈 */
 .login-left::before, .login-left::after {
   content: ''; position: absolute; border-radius: 50%;
-  background: radial-gradient(circle, rgba(20,184,166,.28) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(14,165,233,.30) 0%, transparent 70%);
 }
 .login-left::before { width: 420px; height: 420px; top: -120px; right: -100px; }
 .login-left::after { width: 340px; height: 340px; bottom: -120px; left: -90px; background: radial-gradient(circle, rgba(99,102,241,.22) 0%, transparent 70%); }

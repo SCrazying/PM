@@ -300,7 +300,7 @@ const statusOptions = [
   { value: 'suspended', label: '暂停' },
 ]
 const statusMap = Object.fromEntries(statusOptions.map((o) => [o.value, o.label]))
-const statusColor = (s) => ({ not_started: '#5b7180', in_progress: '#4a63e7', delayed: '#e0423f', completed: '#149a68', suspended: '#d1840c' }[s] || '#5b7180')
+const statusColor = (s) => ({ not_started: '#5b6b7c', in_progress: '#0284c7', delayed: '#dc3c3c', completed: '#0d9d6c', suspended: '#cf8207' }[s] || '#5b7180')
 const taskTag = (t) => (t.status === 'done' ? 'success' : t.overdue ? 'danger' : t.status === 'in_progress' ? 'primary' : 'info')
 const taskText = (t) => (t.status === 'done' ? '已完成' : t.overdue ? '逾期' : t.status === 'in_progress' ? '进行中' : '未开始')
 const doneTaskCount = (tasks) => tasks.filter((t) => t.status === 'done').length

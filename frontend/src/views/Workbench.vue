@@ -211,7 +211,7 @@ onMounted(load)
 .todo-proj {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 11px 12px; border-radius: 10px; cursor: pointer;
-  border: 1px solid var(--pm-border); background: #f8fbfb; margin-bottom: 8px;
+  border: 1px solid var(--pm-border); background: #f7fafc; margin-bottom: 8px;
   transition: all .15s ease;
 }
 .todo-proj:last-of-type { margin-bottom: 0; }

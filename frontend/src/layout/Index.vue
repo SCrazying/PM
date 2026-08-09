@@ -111,7 +111,7 @@ onMounted(loadUnread)
 
 /* 侧边栏：深青墨绿渐变，与青绿主色呼应 */
 .aside {
-  background: linear-gradient(180deg, #10312f 0%, #0c2422 100%);
+  background: linear-gradient(180deg, #0d2840 0%, #0b2237 100%);
   display: flex;
   flex-direction: column;
   transition: width .2s;
@@ -129,7 +129,7 @@ onMounted(loadUnread)
   background: var(--pm-gradient);
   color: #fff; font-weight: 800; font-size: 14px;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 12px rgba(20,184,166,.4);
+  box-shadow: 0 4px 12px rgba(14,165,233,.45);
 }
 .logo-text { color: #fff; font-size: 17px; font-weight: 700; letter-spacing: .5px; }
 
@@ -140,7 +140,7 @@ onMounted(loadUnread)
   flex: 1;
 }
 .menu :deep(.el-menu-item) {
-  color: #9db8b5;
+  color: #93aec2;
   border-radius: 8px;
   margin-bottom: 4px;
   height: 46px;
@@ -153,7 +153,7 @@ onMounted(loadUnread)
 .menu :deep(.el-menu-item.is-active) {
   background: var(--pm-gradient);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(20,184,166,.35);
+  box-shadow: 0 4px 12px rgba(14,165,233,.38);
 }
 .aside-footer {
   padding: 14px 18px;

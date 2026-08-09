@@ -91,7 +91,7 @@ const statusOptions = [
 ]
 const statusMap = Object.fromEntries(statusOptions.map((o) => [o.value, o.label]))
 // 五种状态各一种颜色（下拉圆点取色；chip 样式走全局 .status-chip）
-const statusColor = (s) => ({ not_started: '#5b7180', in_progress: '#4a63e7', delayed: '#e0423f', completed: '#149a68', suspended: '#d1840c' }[s] || '#5b7180')
+const statusColor = (s) => ({ not_started: '#5b6b7c', in_progress: '#0284c7', delayed: '#dc3c3c', completed: '#0d9d6c', suspended: '#cf8207' }[s] || '#5b7180')
 
 // 状态内联编辑：仅负责人/管理员可改，其余只读展示
 const canEditStatus = (row) => userStore.isAdmin || row.owner_id === userStore.userInfo?.user_id

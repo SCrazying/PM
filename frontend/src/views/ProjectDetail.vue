@@ -566,7 +566,7 @@ onMounted(loadAll)
 .proj-comp-num { font-size: 26px; font-weight: 800; color: var(--pm-primary); line-height: 1.1; }
 .pc-pct { font-size: 14px; }
 .proj-comp-label { font-size: 11px; color: var(--pm-text-2); margin-top: 3px; white-space: nowrap; }
-.proj-comp-track { height: 4px; border-radius: 4px; background: #d6ecec; margin-top: 8px; overflow: hidden; }
+.proj-comp-track { height: 4px; border-radius: 4px; background: #d3e9f5; margin-top: 8px; overflow: hidden; }
 .proj-comp-fill { height: 100%; border-radius: 4px; background: var(--pm-gradient); transition: width .4s ease; }
 .card-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; }
 .review-sec { margin-top: 14px; border-top: 1px solid var(--pm-border); padding-top: 10px; }
@@ -597,7 +597,7 @@ onMounted(loadAll)
 .comp-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px; background: var(--pm-primary-lighter); border: 1px solid var(--pm-primary-light); border-radius: 10px; }
 .comp-label { font-size: 12px; color: var(--pm-text-2); white-space: nowrap; }
 .comp-num { font-size: 12px; color: var(--pm-text-2); font-weight: 700; white-space: nowrap; }
-.subnode-box { margin-bottom: 12px; padding: 12px 16px; background: #f8fbfb; border: 1px solid var(--pm-border); border-radius: 10px; }
+.subnode-box { margin-bottom: 12px; padding: 12px 16px; background: #f7fafc; border: 1px solid var(--pm-border); border-radius: 10px; }
 .subnode-title { font-weight: 700; font-size: 13px; display: flex; align-items: center; }
 .subnode-row { display: flex; align-items: center; gap: 10px; padding: 6px 2px; border-bottom: 1px dashed var(--pm-border); }
 .subnode-row:last-child { border-bottom: none; }

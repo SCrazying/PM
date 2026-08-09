@@ -104,21 +104,37 @@ class BoardService:
             q = q.where(Project.owner_id == owner_id)
         projects = list(self.db.execute(q).scalars().all())
 
-        # 当前节点名
-        def node_name(p):
-            if not p.current_node_id:
-                return None
-            n = self.db.get(ProjectNode, p.current_node_id)
+        # 负责人姓名（批量取，避免 N+1）
+        owner_ids = {p.owner_id for p in projects if p.owner_id}
+        owner_map = {}
+        if owner_ids:
+            owner_map = {u.id: u.display_name for u in self.db.execute(
+                select(User).where(User.id.in_(owner_ids))).scalars().all()}
+
+        # 当前节点（批量取，避免 N+1），用于节点名 + 超期判断
+        today = date.today()
+        cur_node_ids = [p.current_node_id for p in projects if p.current_node_id]
+        node_map = {}
+        if cur_node_ids:
+            node_map = {n.id: n for n in self.db.execute(
+                select(ProjectNode).where(ProjectNode.id.in_(cur_node_ids))).scalars().all()}
+
+        def node_name(n):
             return f"{n.node_key} {n.name}" if n else None
+
+        def node_overdue(n):
+            return bool(n and n.status != "passed" and n.planned_end and n.planned_end < today)
 
         columns = {"not_started": [], "in_progress": [], "delayed": [], "completed": [], "suspended": []}
         for p in projects:
             col = p.status  # archived 已被过滤，其余直接进对应列
             if col not in columns:
                 continue
+            cur = node_map.get(p.current_node_id) if p.current_node_id else None
             columns[col].append({
                 "id": p.id, "name": p.name, "code": p.code, "machine_model": p.machine_model,
-                "status": p.status, "current_node": node_name(p),
+                "status": p.status, "current_node": node_name(cur), "node_overdue": node_overdue(cur),
+                "owner_id": p.owner_id, "owner_name": owner_map.get(p.owner_id),
                 "start_date": p.start_date, "end_date": p.end_date,
             })
         return {"columns": columns, "granularity": granularity, "year": year, "month": month}
