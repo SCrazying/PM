@@ -581,17 +581,15 @@ onMounted(loadAll)
 .review-item { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 6px; }
 .goal-text { font-size: 14px; line-height: 1.6; }
 .goal-items { display: flex; flex-direction: column; gap: 3px; }
-.goal-item { display: flex; align-items: flex-start; gap: 6px; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-.goal-item .el-icon { margin-top: 2px; }
-.goal-item .gi-date, .goal-item .gi-owner { margin-top: 1px; }
+.goal-item { display: flex; align-items: flex-start; gap: 6px; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1.5; }
 .goal-item:hover { background: var(--pm-primary-light); }
 .goal-item.done { background: var(--pm-st-completed-bg); }
 .goal-item.done .gi-goal { color: var(--pm-success); text-decoration: line-through; }
-.goal-item .el-icon { color: var(--pm-primary); flex-shrink: 0; }
+.goal-item .el-icon { flex-shrink: 0; height: 20px; display: inline-flex; align-items: center; color: var(--pm-primary); }
 .goal-item.done .el-icon { color: var(--pm-success); }
-.gi-goal { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
-.gi-owner { color: var(--pm-primary); font-size: 12px; font-weight: 600; flex-shrink: 0; }
-.gi-date { color: var(--pm-text-3); font-size: 11.5px; white-space: nowrap; }
+.gi-goal { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; }
+.gi-owner { color: var(--pm-primary); font-weight: 600; flex-shrink: 0; }
+.gi-date { color: var(--pm-text-3); white-space: nowrap; flex-shrink: 0; }
 .gi-overdue { color: var(--pm-danger); font-weight: 600; }
 .gi-ops { display: flex; gap: 2px; flex-shrink: 0; }
 .empty { color: var(--pm-text-3); font-size: 13px; padding: 8px 0; }
