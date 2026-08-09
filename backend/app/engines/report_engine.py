@@ -229,7 +229,7 @@ class ReportService:
         ws.auto_filter.ref = "A1:G1"
 
         projects = self.db.execute(
-            select(Project).where(Project.is_deleted.is_(False), Project.status != "archived").order_by(Project.name)
+            select(Project).where(Project.is_deleted.is_(False)).order_by(Project.name)
         ).scalars().all()
         row_no = 2
         for project in projects:
@@ -321,7 +321,7 @@ class ReportService:
 
         today = date.today()
         projects = self.db.execute(
-            select(Project).where(Project.is_deleted.is_(False), Project.status != "archived").order_by(Project.name)
+            select(Project).where(Project.is_deleted.is_(False)).order_by(Project.name)
         ).scalars().all()
         row_no = 2
         for p in projects:

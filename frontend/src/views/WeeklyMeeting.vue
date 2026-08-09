@@ -296,10 +296,9 @@ const statusOptions = [
   { value: 'delayed', label: '延期' },
   { value: 'completed', label: '已完成' },
   { value: 'suspended', label: '暂停' },
-  { value: 'archived', label: '归档' },
 ]
 const statusMap = Object.fromEntries(statusOptions.map((o) => [o.value, o.label]))
-const statusColor = (s) => ({ not_started: '#8a94a6', in_progress: '#4f6ef7', delayed: '#e64545', completed: '#1aad70', suspended: '#e09000', archived: '#7a5ce0' }[s] || '#8a94a6')
+const statusColor = (s) => ({ not_started: '#8a94a6', in_progress: '#4f6ef7', delayed: '#e64545', completed: '#1aad70', suspended: '#e09000' }[s] || '#8a94a6')
 const taskTag = (t) => (t.status === 'done' ? 'success' : t.overdue ? 'danger' : t.status === 'in_progress' ? 'primary' : 'info')
 const taskText = (t) => (t.status === 'done' ? '已完成' : t.overdue ? '逾期' : t.status === 'in_progress' ? '进行中' : '未开始')
 const doneTaskCount = (tasks) => tasks.filter((t) => t.status === 'done').length
@@ -424,7 +423,6 @@ onMounted(async () => {
 .status-chip.st-delayed { background: #fdeeee; color: #e64545; border-color: #f5bdbd; }
 .status-chip.st-completed { background: #eafaf2; color: #149a66; border-color: #b5ecd4; }
 .status-chip.st-suspended { background: #fff6e8; color: #d98200; border-color: #f7dbb1; }
-.status-chip.st-archived { background: #f3effd; color: #7a5ce0; border-color: #d8cbf6; }
 .role-summary { white-space: pre-line; line-height: 1.45; font-size: 12px; }
 .node-deadline { margin-top: 3px; }
 .report-body { padding: 6px 4px; }

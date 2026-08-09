@@ -54,7 +54,7 @@ const total = ref(0)
 const selection = ref([])
 const query = ref({ page: 1, size: 10 })
 
-const statusMap = { not_started: '未开始', in_progress: '进行中', delayed: '延期', suspended: '暂停', completed: '已完成', archived: '归档' }
+const statusMap = { not_started: '未开始', in_progress: '进行中', delayed: '延期', suspended: '暂停', completed: '已完成' }
 const fmtTime = (t) => (t ? String(t).replace('T', ' ').slice(0, 19) : '—')
 
 async function load() {
@@ -104,5 +104,4 @@ onMounted(load)
 .status-chip.st-delayed { background: #fdeeee; color: #e64545; border-color: #f5bdbd; }
 .status-chip.st-completed { background: #eafaf2; color: #149a66; border-color: #b5ecd4; }
 .status-chip.st-suspended { background: #fff6e8; color: #d98200; border-color: #f7dbb1; }
-.status-chip.st-archived { background: #f3effd; color: #7a5ce0; border-color: #d8cbf6; }
 </style>

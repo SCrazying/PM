@@ -324,7 +324,7 @@ const subnodes = ref([])
 const subnodeVisible = ref(false)
 const subnodeForm = reactive({ id: null, name: '', planned_end: null })
 
-const statusMap = { not_started: '未开始', in_progress: '进行中', delayed: '延期', suspended: '暂停', completed: '已完成', archived: '归档' }
+const statusMap = { not_started: '未开始', in_progress: '进行中', delayed: '延期', suspended: '暂停', completed: '已完成' }
 const taskVisible = ref(false)
 const taskForm = reactive({ id: null, title: '', assignee_id: null, planned_start: null, planned_end: null, description: '' })
 const memberVisible = ref(false)

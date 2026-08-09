@@ -79,18 +79,17 @@ const nodeCache = ref({})
 const machineOptions = ref([])
 const query = useViewFilterStore().projectList
 
-// 项目状态：手动配置（未开始/进行中/延期/已完成/暂停/归档）
+// 项目状态：手动配置（未开始/进行中/延期/已完成/暂停），已完成即终态
 const statusOptions = [
   { value: 'not_started', label: '未开始' },
   { value: 'in_progress', label: '进行中' },
   { value: 'delayed', label: '延期' },
   { value: 'completed', label: '已完成' },
   { value: 'suspended', label: '暂停' },
-  { value: 'archived', label: '归档' },
 ]
 const statusMap = Object.fromEntries(statusOptions.map((o) => [o.value, o.label]))
-// 六种状态各一种颜色（chip 背景/文字/圆点统一取色）
-const statusColor = (s) => ({ not_started: '#8a94a6', in_progress: '#4f6ef7', delayed: '#e64545', completed: '#1aad70', suspended: '#e09000', archived: '#7a5ce0' }[s] || '#8a94a6')
+// 五种状态各一种颜色（chip 背景/文字/圆点统一取色）
+const statusColor = (s) => ({ not_started: '#8a94a6', in_progress: '#4f6ef7', delayed: '#e64545', completed: '#1aad70', suspended: '#e09000' }[s] || '#8a94a6')
 
 // 状态内联编辑：仅负责人/管理员可改，其余只读展示
 const canEditStatus = (row) => userStore.isAdmin || row.owner_id === userStore.userInfo?.user_id
@@ -166,6 +165,5 @@ onMounted(async () => {
 .status-chip.st-delayed { background: #fdeeee; color: #e64545; border-color: #f5bdbd; }
 .status-chip.st-completed { background: #eafaf2; color: #149a66; border-color: #b5ecd4; }
 .status-chip.st-suspended { background: #fff6e8; color: #d98200; border-color: #f7dbb1; }
-.status-chip.st-archived { background: #f3effd; color: #7a5ce0; border-color: #d8cbf6; }
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 </style>

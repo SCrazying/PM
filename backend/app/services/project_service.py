@@ -268,12 +268,10 @@ class ProjectService:
                 ).scalar_one_or_none()
                 if exists:
                     raise BizException("项目编号已存在", code=409, http_status=409)
-        # 项目状态手动配置：白名单校验；置归档时补记 archived_at
+        # 项目状态手动配置：白名单校验
         if "status" in data:
             if data["status"] not in PROJECT_STATUSES:
                 raise BizException("项目状态不合法", code=400, http_status=400)
-            if data["status"] == "archived" and project.status != "archived":
-                project.archived_at = date.today()
         for f, v in data.items():
             setattr(project, f, v)
         if role_assignments is not None:
@@ -329,17 +327,6 @@ class ProjectService:
                 raise BizException("节点不属于当前项目")
             node.planned_end = item.get("planned_end")
         self.db.flush()
-
-    def archive_project(self, project_id: int, user: dict, archive: bool = True) -> Project:
-        project = self.get_project(project_id)
-        self.check_owner(project, user)
-        project.status = "archived" if archive else "in_progress"
-        if archive:
-            from datetime import date as _d
-            project.archived_at = _d.today()
-        self.db.commit()
-        self.db.refresh(project)
-        return project
 
     def delete_project(self, project_id: int, user: dict) -> None:
         project = self.get_project(project_id)

@@ -86,20 +86,6 @@ def update_project(project_id: int, body: ProjectUpdate, user: dict = Depends(ge
     return ok(ProjectOut.model_validate(p).model_dump(), message="更新成功")
 
 
-@router.post("/{project_id}/archive")
-def archive_project(project_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    p = ProjectService(db).archive_project(project_id, user, archive=True)
-    record_audit(db, user["user_id"], "update", "project", str(project_id), {"status": "archived"})
-    return ok(ProjectOut.model_validate(p).model_dump(), message="已归档")
-
-
-@router.post("/{project_id}/unarchive")
-def unarchive_project(project_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    p = ProjectService(db).archive_project(project_id, user, archive=False)
-    record_audit(db, user["user_id"], "update", "project", str(project_id), {"status": "in_progress"})
-    return ok(ProjectOut.model_validate(p).model_dump(), message="已恢复")
-
-
 @router.delete("/{project_id}")
 def delete_project(project_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     ProjectService(db).delete_project(project_id, user)

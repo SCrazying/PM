@@ -7,8 +7,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, IdMixin, SoftDeleteMixin, TimestampMixin
 
 
-# 项目状态：手动配置，不随 TR 流程自动派生（M7）
-PROJECT_STATUSES = ("not_started", "in_progress", "delayed", "completed", "suspended", "archived")
+# 项目状态：手动配置，不随 TR 流程自动派生（M7）；已完成即终态，彻底移除用删除（回收站）
+PROJECT_STATUSES = ("not_started", "in_progress", "delayed", "completed", "suspended")
 # 在研口径：工作台待办 / 周会聚合 / 看板参与计算 的活跃状态
 ACTIVE_PROJECT_STATUSES = ("not_started", "in_progress", "delayed", "suspended")
 

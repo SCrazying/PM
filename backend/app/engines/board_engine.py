@@ -18,7 +18,7 @@ class BoardService:
         """聚合统计：状态分布 / 未关闭风险 / 待关注项目（当前节点超期）/ 我的待办。"""
         today = date.today()
         projects = list(self.db.execute(
-            select(Project).where(Project.is_deleted.is_(False), Project.status != "archived")
+            select(Project).where(Project.is_deleted.is_(False))
         ).scalars().all())
 
         # 状态分布
@@ -97,7 +97,7 @@ class BoardService:
     # ---------- 看板列 ----------
     def board(self, granularity="month", year=None, month=None, machine_model=None, owner_id=None) -> dict:
         """看板按项目状态分桶（列=status，唯一规则见架构 §5.2）。"""
-        q = select(Project).where(Project.is_deleted.is_(False), Project.status != "archived")
+        q = select(Project).where(Project.is_deleted.is_(False))
         if machine_model:
             q = q.where(Project.machine_model == machine_model)
         if owner_id:

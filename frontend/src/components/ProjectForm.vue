@@ -139,7 +139,6 @@ const statusOptions = [
   { value: 'delayed', label: '延期' },
   { value: 'completed', label: '已完成' },
   { value: 'suspended', label: '暂停' },
-  { value: 'archived', label: '归档' },
 ]
 
 function emptyRoleAssignments() {

@@ -65,7 +65,7 @@ CREATE TABLE project (
     code            VARCHAR(64)  NOT NULL,
     machine_model   VARCHAR(64),                                -- 机型
     owner_id        BIGINT NOT NULL REFERENCES "user"(id) ON DELETE RESTRICT,
-    status          VARCHAR(16)  NOT NULL DEFAULT 'not_started',-- not_started/in_progress/delayed/completed/suspended/archived（手动配置）
+    status          VARCHAR(16)  NOT NULL DEFAULT 'not_started',-- not_started/in_progress/delayed/completed/suspended（手动配置，已完成即终态）
     health          VARCHAR(16)  NOT NULL DEFAULT 'on_track',   -- on_track/at_risk/delayed（终态冻结，见§5.2）
     current_node_id BIGINT,                                     -- 当前TR节点（冗余，FK在 project_node 建好后补）
     start_date      DATE,
