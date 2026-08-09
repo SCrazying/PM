@@ -109,9 +109,9 @@ onMounted(loadUnread)
 <style scoped>
 .layout { height: 100vh; }
 
-/* 侧边栏：深色渐变 */
+/* 侧边栏：深青墨绿渐变，与青绿主色呼应 */
 .aside {
-  background: linear-gradient(180deg, #1b2540 0%, #151d33 100%);
+  background: linear-gradient(180deg, #10312f 0%, #0c2422 100%);
   display: flex;
   flex-direction: column;
   transition: width .2s;
@@ -122,14 +122,14 @@ onMounted(loadUnread)
   gap: 10px;
   height: 60px;
   padding: 0 18px;
-  border-bottom: 1px solid rgba(255,255,255,.06);
+  border-bottom: 1px solid rgba(255,255,255,.07);
 }
 .logo-icon {
   width: 34px; height: 34px; border-radius: 9px;
   background: var(--pm-gradient);
   color: #fff; font-weight: 800; font-size: 14px;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 12px rgba(79,110,247,.4);
+  box-shadow: 0 4px 12px rgba(20,184,166,.4);
 }
 .logo-text { color: #fff; font-size: 17px; font-weight: 700; letter-spacing: .5px; }
 
@@ -140,26 +140,26 @@ onMounted(loadUnread)
   flex: 1;
 }
 .menu :deep(.el-menu-item) {
-  color: #a7b0c3;
+  color: #9db8b5;
   border-radius: 8px;
   margin-bottom: 4px;
   height: 46px;
   line-height: 46px;
 }
 .menu :deep(.el-menu-item:hover) {
-  background: rgba(255,255,255,.06);
+  background: rgba(255,255,255,.07);
   color: #fff;
 }
 .menu :deep(.el-menu-item.is-active) {
   background: var(--pm-gradient);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(79,110,247,.35);
+  box-shadow: 0 4px 12px rgba(20,184,166,.35);
 }
 .aside-footer {
   padding: 14px 18px;
   color: rgba(255,255,255,.35);
   font-size: 12px;
-  border-top: 1px solid rgba(255,255,255,.06);
+  border-top: 1px solid rgba(255,255,255,.07);
 }
 
 /* 顶栏 */

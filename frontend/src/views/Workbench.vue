@@ -96,9 +96,10 @@
           </el-form>
         </div>
 
-        <div class="pm-card" v-else>
-          <div class="card-title" style="margin-bottom:12px">填报说明</div>
-          <p class="pm-sub">从左侧选择一个项目开始填报今日进展。进展会自动汇总到项目周报与周会视图；最近进展可直接编辑。</p>
+        <div class="pm-card fill-placeholder" v-else>
+          <div class="fp-icon"><el-icon :size="30"><EditPen /></el-icon></div>
+          <div class="card-title">填报今日进展</div>
+          <p class="pm-sub">从左侧选择一个项目开始填报。进展会自动汇总到项目周报与周会视图，最近进展可直接编辑。</p>
         </div>
       </el-col>
     </el-row>
@@ -207,17 +208,33 @@ onMounted(load)
 <style scoped>
 .card-title { font-weight: 700; font-size: 15px; }
 .empty { color: var(--pm-text-3); text-align: center; padding: 24px 0; font-size: 13px; }
-.todo-proj { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background .12s; }
-.todo-proj:hover { background: var(--pm-primary-light); }
-.tp-left { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.todo-proj {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 11px 12px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--pm-border); background: #f8fbfb; margin-bottom: 8px;
+  transition: all .15s ease;
+}
+.todo-proj:last-of-type { margin-bottom: 0; }
+.todo-proj:hover { border-color: var(--pm-primary-light); background: var(--pm-primary-lighter); transform: translateY(-1px); box-shadow: var(--pm-shadow); }
+.tp-left { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.tp-left .pm-dot { margin-top: 6px; }
 .tp-name { font-weight: 600; font-size: 14px; }
-.todo-task { display: flex; align-items: center; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--pm-border); }
+.todo-task { display: flex; align-items: center; gap: 8px; padding: 9px 4px; border-bottom: 1px solid var(--pm-border); transition: background .12s; }
+.todo-task:hover { background: var(--pm-primary-lighter); }
 .todo-task:last-child { border-bottom: none; }
 .tt-title { font-size: 14px; }
-.recent-progress { padding: 9px 0; border-bottom: 1px solid var(--pm-border); }
+.recent-progress { padding: 10px 0; border-bottom: 1px solid var(--pm-border); }
 .recent-progress:last-child { border-bottom: none; }
 .recent-head { display: flex; align-items: center; justify-content: space-between; }
 .recent-node { margin-top: 4px; }
 .recent-work { font-size: 13px; line-height: 1.6; margin-top: 4px; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }
 .risk { color: var(--pm-danger); font-size: 12px; margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
+.fill-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 60px 24px; }
+.fill-placeholder .card-title { margin-top: 14px; }
+.fill-placeholder p { max-width: 380px; margin-top: 8px; line-height: 1.7; }
+.fp-icon {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: var(--pm-primary-lighter); border: 1px solid var(--pm-primary-light);
+  color: var(--pm-primary); display: flex; align-items: center; justify-content: center;
+}
 </style>

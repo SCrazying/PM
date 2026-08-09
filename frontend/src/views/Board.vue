@@ -106,27 +106,27 @@ const loading = ref(false)
 const machineOptions = ref([])
 const filters = useViewFilterStore().board
 const columns = ref([
-  { key: 'not_started', title: '未开始', color: '#8a94a6', items: [] },
-  { key: 'in_progress', title: '进行中', color: '#4f6ef7', items: [] },
-  { key: 'delayed', title: '延期', color: '#e64545', items: [] },
-  { key: 'completed', title: '已完成', color: '#1aad70', items: [] },
-  { key: 'suspended', title: '暂停', color: '#e09000', items: [] },
+  { key: 'not_started', title: '未开始', color: '#5b7180', items: [] },
+  { key: 'in_progress', title: '进行中', color: '#4a63e7', items: [] },
+  { key: 'delayed', title: '延期', color: '#e0423f', items: [] },
+  { key: 'completed', title: '已完成', color: '#149a68', items: [] },
+  { key: 'suspended', title: '暂停', color: '#d1840c', items: [] },
 ])
 const summary = ref(null)
 
 const statusMap = { not_started: '未开始', in_progress: '进行中', delayed: '延期', completed: '已完成', suspended: '暂停' }
-const statusColor = { not_started: '#8a94a6', in_progress: '#4f6ef7', delayed: '#e64545', completed: '#1aad70', suspended: '#e09000' }
+const statusColor = { not_started: '#5b7180', in_progress: '#4a63e7', delayed: '#e0423f', completed: '#149a68', suspended: '#d1840c' }
 
 // 统计卡片：在研 / 已完成 / 延期 / 未开始 / 未关闭风险 / 我的待办任务
 const statCards = computed(() => {
   const s = summary.value || {}
   return [
-    { label: '在研项目', value: s.active ?? '—', color: '#4f6ef7' },
-    { label: '已完成', value: s.completed ?? '—', color: '#1aad70' },
-    { label: '延期', value: (s.status_counts || {}).delayed ?? '—', color: '#e64545' },
-    { label: '未开始', value: (s.status_counts || {}).not_started ?? '—', color: '#8a94a6' },
-    { label: '未关闭风险', value: s.risk_count ?? '—', color: '#f5a623' },
-    { label: '我的待办任务', value: s.my_task_count ?? '—', color: '#7a5ce0' },
+    { label: '在研项目', value: s.active ?? '—', color: '#0ea5a4' },
+    { label: '已完成', value: s.completed ?? '—', color: '#149a68' },
+    { label: '延期', value: (s.status_counts || {}).delayed ?? '—', color: '#e0423f' },
+    { label: '未开始', value: (s.status_counts || {}).not_started ?? '—', color: '#5b7180' },
+    { label: '未关闭风险', value: s.risk_count ?? '—', color: '#f0a020' },
+    { label: '我的待办任务', value: s.my_task_count ?? '—', color: '#6366f1' },
   ]
 })
 
@@ -159,44 +159,38 @@ onMounted(async () => {
 
 <style scoped>
 .dash-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 14px; }
-.stat-card { background: var(--pm-card); border-radius: var(--pm-radius); border-top: 3px solid; padding: 14px 16px; box-shadow: var(--pm-shadow); }
+.stat-card { background: var(--pm-card); border-radius: var(--pm-radius); border-top: 3px solid; padding: 14px 16px; box-shadow: var(--pm-shadow); transition: transform .18s ease, box-shadow .18s ease; }
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--pm-shadow-lg); }
 .stat-num { font-size: 26px; font-weight: 700; line-height: 1.2; }
 .stat-label { color: var(--pm-text-2); font-size: 12.5px; margin-top: 4px; }
 
 .dash-section { background: var(--pm-card); border-radius: var(--pm-radius); box-shadow: var(--pm-shadow); padding: 14px 16px; margin-bottom: 14px; }
-.dash-h { font-weight: 700; font-size: 14px; margin-bottom: 10px; color: var(--pm-text-1); }
+.dash-h { font-weight: 700; font-size: 14px; margin-bottom: 10px; color: var(--pm-text); }
 .dash-row { margin-bottom: 0; }
 
-.dist-bar { display: flex; height: 14px; border-radius: 8px; overflow: hidden; background: #eef1f6; }
+.dist-bar { display: flex; height: 14px; border-radius: 8px; overflow: hidden; background: var(--pm-st-notstarted-bg); }
 .dist-seg { height: 100%; transition: width .3s; }
 .dist-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; }
 .dist-item { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--pm-text-2); }
 .dist-dot { width: 8px; height: 8px; border-radius: 50%; }
 
 .dash-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
-.dash-item { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; cursor: pointer; border: 1px solid var(--pm-border); background: var(--pm-bg); }
-.dash-item:hover { border-color: var(--pm-primary-light); background: var(--pm-primary-light); }
+.dash-item { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; cursor: pointer; border: 1px solid var(--pm-border); background: var(--pm-bg); transition: all .15s ease; }
+.dash-item:hover { border-color: var(--pm-primary-light); background: var(--pm-primary-lighter); }
 .dash-name { font-weight: 600; font-size: 13px; flex: 0 1 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-sub { color: var(--pm-text-2); font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-date { color: var(--pm-text-3); font-size: 12px; flex-shrink: 0; }
 .dash-tag { background: var(--pm-primary-light); color: var(--pm-primary); font-size: 12px; padding: 1px 8px; border-radius: 6px; flex-shrink: 0; }
 .dash-risk { font-size: 12.5px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.risk-item .dash-tag { background: #fdeeee; color: #e64545; }
+.risk-item .dash-tag { background: var(--pm-st-delayed-bg); color: var(--pm-st-delayed-fg); }
 .dash-empty { color: var(--pm-text-3); font-size: 13px; padding: 12px 0; text-align: center; }
-
-.status-chip { display: inline-flex; align-items: center; padding: 1px 10px; border-radius: 10px; font-size: 12px; line-height: 18px; border: 1px solid; flex-shrink: 0; }
-.status-chip.st-not_started { background: #eef1f6; color: #5c6b84; border-color: #d8dfe9; }
-.status-chip.st-in_progress { background: #edf1ff; color: #3a63f0; border-color: #c8d5ff; }
-.status-chip.st-delayed { background: #fdeeee; color: #e64545; border-color: #f5bdbd; }
-.status-chip.st-completed { background: #eafaf2; color: #149a66; border-color: #b5ecd4; }
-.status-chip.st-suspended { background: #fff6e8; color: #d98200; border-color: #f7dbb1; }
 
 .board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; }
 .board-col { flex: 1; min-width: 230px; display: flex; flex-direction: column; }
 .col-head { background: var(--pm-card); border-radius: var(--pm-radius) var(--pm-radius) 0 0; border-top: 3px solid; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--pm-shadow); }
 .col-title { font-weight: 700; font-size: 14px; display: flex; align-items: center; }
-.col-count { background: #eef1f6; color: var(--pm-text-2); border-radius: 10px; padding: 1px 9px; font-size: 12px; font-weight: 600; }
-.col-body { background: #eceff4; border-radius: 0 0 var(--pm-radius) var(--pm-radius); padding: 10px; min-height: 300px; flex: 1; }
+.col-count { background: var(--pm-st-notstarted-bg); color: var(--pm-text-2); border-radius: 10px; padding: 1px 9px; font-size: 12px; font-weight: 600; }
+.col-body { background: #e8eef0; border-radius: 0 0 var(--pm-radius) var(--pm-radius); padding: 10px; min-height: 300px; flex: 1; }
 .proj-card { background: var(--pm-card); border-radius: var(--pm-radius); padding: 12px 14px; margin-bottom: 10px; cursor: pointer; border: 1px solid transparent; transition: all .15s ease; box-shadow: var(--pm-shadow); }
 .proj-card:hover { transform: translateY(-2px); box-shadow: var(--pm-shadow-lg); border-color: var(--pm-primary-light); }
 .pc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }

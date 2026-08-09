@@ -1,52 +1,54 @@
 <template>
   <div>
-    <div class="pm-toolbar">
-      <span class="pm-page-title">周会视图</span>
-      <el-date-picker v-model="weekStart" type="week" format="YYYY 第 ww 周" value-format="YYYY-MM-DD"
-                      style="width: 180px" @change="load" />
-      <el-select v-model="filterMachine" clearable filterable placeholder="按机型筛选" style="width: 150px">
-        <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
-      </el-select>
-      <template v-if="view === 'project'">
-        <el-select v-model="filterStatus" clearable placeholder="状态筛选" style="width: 130px">
-          <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
+    <div class="pm-card toolbar-card">
+      <div class="pm-toolbar" style="margin-bottom:0">
+        <span class="pm-page-title">周会视图</span>
+        <el-date-picker v-model="weekStart" type="week" format="YYYY 第 ww 周" value-format="YYYY-MM-DD"
+                        style="width: 180px" @change="load" />
+        <el-select v-model="filterMachine" clearable filterable placeholder="按机型筛选" style="width: 150px">
+          <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
         </el-select>
-        <el-select v-model="filterRole" clearable placeholder="角色（默认 FO/TL）" style="width: 150px">
-          <el-option v-for="r in roleFilterOptions" :key="r.value" :label="r.label" :value="r.value" />
-        </el-select>
-        <el-select v-model="filterPerson" clearable filterable placeholder="按人筛选" style="width: 130px">
-          <el-option v-for="u in memberUsers" :key="u.id" :label="u.display_name" :value="u.id" />
-        </el-select>
-      </template>
-      <template v-if="view === 'person'">
-        <el-select v-model="filterPerson" clearable filterable placeholder="按人筛选" style="width: 130px">
-          <el-option v-for="u in personUsers" :key="u.user_id" :label="u.display_name" :value="u.user_id" />
-        </el-select>
-        <el-select v-model="filterRole" clearable placeholder="角色（默认 FO/TL）" style="width: 150px">
-          <el-option v-for="r in roleFilterOptions" :key="r.value" :label="r.label" :value="r.value" />
-        </el-select>
-      </template>
-      <div style="flex:1"></div>
-      <el-dropdown @command="downloadLedger">
-        <el-button type="success" :loading="exporting">
-          <el-icon style="margin-right:5px"><Download /></el-icon>导出台账<el-icon><ArrowDown /></el-icon>
-        </el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="weekly">导出本周台账</el-dropdown-item>
-            <el-dropdown-item command="project">导出项目台账（每周任务合集）</el-dropdown-item>
-            <el-dropdown-item command="completion">导出项目完成台账</el-dropdown-item>
-          </el-dropdown-menu>
+        <template v-if="view === 'project'">
+          <el-select v-model="filterStatus" clearable placeholder="状态筛选" style="width: 130px">
+            <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+          <el-select v-model="filterRole" clearable placeholder="角色（默认 FO/TL）" style="width: 150px">
+            <el-option v-for="r in roleFilterOptions" :key="r.value" :label="r.label" :value="r.value" />
+          </el-select>
+          <el-select v-model="filterPerson" clearable filterable placeholder="按人筛选" style="width: 130px">
+            <el-option v-for="u in memberUsers" :key="u.id" :label="u.display_name" :value="u.id" />
+          </el-select>
         </template>
-      </el-dropdown>
-      <el-radio-group v-model="view" @change="load">
-        <el-radio-button value="project">按项目</el-radio-button>
-        <el-radio-button value="person">按人</el-radio-button>
-      </el-radio-group>
+        <template v-if="view === 'person'">
+          <el-select v-model="filterPerson" clearable filterable placeholder="按人筛选" style="width: 130px">
+            <el-option v-for="u in personUsers" :key="u.user_id" :label="u.display_name" :value="u.user_id" />
+          </el-select>
+          <el-select v-model="filterRole" clearable placeholder="角色（默认 FO/TL）" style="width: 150px">
+            <el-option v-for="r in roleFilterOptions" :key="r.value" :label="r.label" :value="r.value" />
+          </el-select>
+        </template>
+        <div style="flex:1"></div>
+        <el-dropdown @command="downloadLedger">
+          <el-button type="success" :loading="exporting">
+            <el-icon style="margin-right:5px"><Download /></el-icon>导出台账<el-icon><ArrowDown /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="weekly">导出本周台账</el-dropdown-item>
+              <el-dropdown-item command="project">导出项目台账（每周任务合集）</el-dropdown-item>
+              <el-dropdown-item command="completion">导出项目完成台账</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-radio-group v-model="view" @change="load">
+          <el-radio-button value="project">按项目</el-radio-button>
+          <el-radio-button value="person">按人</el-radio-button>
+        </el-radio-group>
+      </div>
     </div>
 
     <!-- Excel 风格项目台账：默认不展开，展开行查看周报详情。 -->
-    <div v-if="view === 'project'" v-loading="loading">
+    <div v-if="view === 'project'" v-loading="loading" class="pm-card table-card">
       <el-table
         :data="filteredReports"
         row-key="project.id"
@@ -184,7 +186,7 @@
     </div>
 
     <!-- 按人视图 -->
-    <div v-else v-loading="loading">
+    <div v-else v-loading="loading" class="pm-card table-card">
       <el-table :data="filteredPersonReports" border stripe v-if="filteredPersonReports.length">
         <el-table-column prop="display_name" label="成员" width="110" fixed />
         <el-table-column label="项目（角色/投入/进展数）" min-width="320">
@@ -298,7 +300,7 @@ const statusOptions = [
   { value: 'suspended', label: '暂停' },
 ]
 const statusMap = Object.fromEntries(statusOptions.map((o) => [o.value, o.label]))
-const statusColor = (s) => ({ not_started: '#8a94a6', in_progress: '#4f6ef7', delayed: '#e64545', completed: '#1aad70', suspended: '#e09000' }[s] || '#8a94a6')
+const statusColor = (s) => ({ not_started: '#5b7180', in_progress: '#4a63e7', delayed: '#e0423f', completed: '#149a68', suspended: '#d1840c' }[s] || '#5b7180')
 const taskTag = (t) => (t.status === 'done' ? 'success' : t.overdue ? 'danger' : t.status === 'in_progress' ? 'primary' : 'info')
 const taskText = (t) => (t.status === 'done' ? '已完成' : t.overdue ? '逾期' : t.status === 'in_progress' ? '进行中' : '未开始')
 const doneTaskCount = (tasks) => tasks.filter((t) => t.status === 'done').length
@@ -415,14 +417,10 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.toolbar-card { padding: 14px 18px; margin-bottom: 14px; }
+.table-card { padding: 6px 18px 16px; }
 .project-name { font-weight: 700; cursor: pointer; color: var(--pm-primary); }
 .project-name:hover { text-decoration: underline; }
-.status-chip { display: inline-flex; align-items: center; padding: 1px 10px; border-radius: 10px; font-size: 12px; line-height: 18px; border: 1px solid; }
-.status-chip.st-not_started { background: #eef1f6; color: #5c6b84; border-color: #d8dfe9; }
-.status-chip.st-in_progress { background: #edf1ff; color: #3a63f0; border-color: #c8d5ff; }
-.status-chip.st-delayed { background: #fdeeee; color: #e64545; border-color: #f5bdbd; }
-.status-chip.st-completed { background: #eafaf2; color: #149a66; border-color: #b5ecd4; }
-.status-chip.st-suspended { background: #fff6e8; color: #d98200; border-color: #f7dbb1; }
 .role-summary { white-space: pre-line; line-height: 1.45; font-size: 12px; }
 .node-deadline { margin-top: 3px; }
 .report-body { padding: 6px 4px; }
@@ -444,7 +442,7 @@ onMounted(async () => {
 .goal-items { display: flex; flex-direction: column; gap: 3px; }
 .goal-item { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; min-height: 24px; }
 .goal-item:hover { background: var(--pm-primary-light); }
-.goal-item.done { background: #e9f9f0; }
+.goal-item.done { background: var(--pm-st-completed-bg); }
 .goal-item.done .gi-goal { color: var(--pm-success); text-decoration: line-through; }
 .goal-item .el-icon { color: var(--pm-primary); flex-shrink: 0; }
 .goal-item.done .el-icon { color: var(--pm-success); }
@@ -453,7 +451,7 @@ onMounted(async () => {
 .gi-overdue { color: var(--pm-danger); font-weight: 600; }
 .sub-inline { cursor: pointer; }
 .sub-inline:hover { background: var(--pm-primary-light); }
-.sub-inline.done { background: #e9f9f0; }
+.sub-inline.done { background: var(--pm-st-completed-bg); }
 .sub-inline.done .si-name { color: var(--pm-success); text-decoration: line-through; }
 .sub-inline.done .el-icon { color: var(--pm-success); }
 .sub-inline .el-icon { color: var(--pm-primary); flex-shrink: 0; }
@@ -463,20 +461,20 @@ onMounted(async () => {
 
 .daily-inline { display: flex; flex-direction: column; gap: 4px; }
 .daily-inline-item { display: flex; align-items: flex-start; gap: 5px; font-size: 12.5px; line-height: 1.5; }
-.di-date { color: var(--pm-text-3); font-size: 11px; white-space: nowrap; background: #eef1f6; padding: 0 5px; border-radius: 4px; flex-shrink: 0; }
+.di-date { color: var(--pm-text-3); font-size: 11px; white-space: nowrap; background: var(--pm-st-notstarted-bg); padding: 0 5px; border-radius: 4px; flex-shrink: 0; }
 .di-author { color: var(--pm-primary); font-weight: 600; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
 .di-work { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }
 
-.risk-item { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 8px; padding: 5px 8px; border-radius: 6px; cursor: pointer; background: #fef3f2; }
+.risk-item { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 8px; padding: 5px 8px; border-radius: 6px; cursor: pointer; background: var(--pm-st-delayed-bg); }
 .risk-item:hover { outline: 1px solid var(--pm-danger); }
-.risk-item.resolved { background: #e9f9f0; }
+.risk-item.resolved { background: var(--pm-st-completed-bg); }
 .risk-ico { color: var(--pm-danger); flex-shrink: 0; }
 .risk-item.resolved .risk-ico { color: var(--pm-success); }
 .risk-txt { flex: 1; min-width: 0; }
 .risk-item.resolved .risk-txt { color: var(--pm-text-3); text-decoration: line-through; }
 .risk-meta { color: var(--pm-text-3); font-size: 11.5px; white-space: nowrap; }
-.subnode-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: #f2f5fb; border: 1px solid var(--pm-border); border-radius: 20px; cursor: pointer; font-size: 13px; transition: all .15s; }
+.subnode-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: var(--pm-fill-light, #f4f7f8); border: 1px solid var(--pm-border); border-radius: 20px; cursor: pointer; font-size: 13px; transition: all .15s; }
 .subnode-chip:hover { border-color: var(--pm-primary); background: var(--pm-primary-light); }
-.subnode-chip.done { background: #e9f9f0; border-color: #bfe8d4; }
+.subnode-chip.done { background: var(--pm-st-completed-bg); border-color: var(--pm-st-completed-bd); }
 .subnode-chip.done .sn-txt { color: var(--pm-text-3); text-decoration: line-through; }
 </style>

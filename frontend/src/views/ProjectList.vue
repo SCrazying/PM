@@ -1,18 +1,20 @@
 <template>
-  <div>
-    <div class="toolbar">
-      <el-input v-model="query.keyword" placeholder="项目名/编号" clearable style="width: 200px" @keyup.enter="load" />
-      <el-select v-model="query.status" placeholder="状态" clearable style="width: 130px">
-        <el-option v-for="(v, k) in statusMap" :key="k" :label="v" :value="k" />
-      </el-select>
-      <el-select v-model="query.machine_model" placeholder="机型" clearable filterable style="width: 130px" @change="load">
-        <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
-      </el-select>
-      <el-button type="primary" @click="load">查询</el-button>
-      <el-button type="success" style="margin-left: auto" @click="openCreate">新建项目</el-button>
+  <div class="pm-card page-card">
+    <div class="pm-flex-between toolbar">
+      <div class="pm-flex pm-gap">
+        <el-input v-model="query.keyword" placeholder="项目名/编号" clearable style="width: 200px" @keyup.enter="load" />
+        <el-select v-model="query.status" placeholder="状态" clearable style="width: 130px">
+          <el-option v-for="(v, k) in statusMap" :key="k" :label="v" :value="k" />
+        </el-select>
+        <el-select v-model="query.machine_model" placeholder="机型" clearable filterable style="width: 130px" @change="load">
+          <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
+        </el-select>
+        <el-button type="primary" @click="load">查询</el-button>
+      </div>
+      <el-button type="success" @click="openCreate"><el-icon style="margin-right:4px"><Plus /></el-icon>新建项目</el-button>
     </div>
 
-    <el-table :data="rows" v-loading="loading" border stripe @sort-change="onSortChange">
+    <el-table :data="rows" v-loading="loading" stripe @sort-change="onSortChange">
       <el-table-column prop="name" label="项目名称" min-width="200" sortable="custom">
         <template #default="{ row }">
           <el-link type="primary" @click="goDetail(row)">{{ row.name }}</el-link>
@@ -52,7 +54,7 @@
     </el-table>
 
     <el-pagination
-      style="margin-top: 12px; justify-content: flex-end"
+      class="page-pager"
       background layout="total, prev, pager, next" :total="total"
       :page-size="query.size" :current-page="query.page" @current-change="(p) => { query.page = p; load() }" />
 
@@ -88,8 +90,8 @@ const statusOptions = [
   { value: 'suspended', label: '暂停' },
 ]
 const statusMap = Object.fromEntries(statusOptions.map((o) => [o.value, o.label]))
-// 五种状态各一种颜色（chip 背景/文字/圆点统一取色）
-const statusColor = (s) => ({ not_started: '#8a94a6', in_progress: '#4f6ef7', delayed: '#e64545', completed: '#1aad70', suspended: '#e09000' }[s] || '#8a94a6')
+// 五种状态各一种颜色（下拉圆点取色；chip 样式走全局 .status-chip）
+const statusColor = (s) => ({ not_started: '#5b7180', in_progress: '#4a63e7', delayed: '#e0423f', completed: '#149a68', suspended: '#d1840c' }[s] || '#5b7180')
 
 // 状态内联编辑：仅负责人/管理员可改，其余只读展示
 const canEditStatus = (row) => userStore.isAdmin || row.owner_id === userStore.userInfo?.user_id
@@ -158,12 +160,9 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
-.status-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 10px; border-radius: 10px; font-size: 12px; line-height: 18px; border: 1px solid; cursor: pointer; }
-.status-chip.st-not_started { background: #eef1f6; color: #5c6b84; border-color: #d8dfe9; }
-.status-chip.st-in_progress { background: #edf1ff; color: #3a63f0; border-color: #c8d5ff; }
-.status-chip.st-delayed { background: #fdeeee; color: #e64545; border-color: #f5bdbd; }
-.status-chip.st-completed { background: #eafaf2; color: #149a66; border-color: #b5ecd4; }
-.status-chip.st-suspended { background: #fff6e8; color: #d98200; border-color: #f7dbb1; }
+.page-card { padding: 18px 20px; }
+.toolbar { margin-bottom: 16px; }
+.page-pager { margin-top: 16px; justify-content: flex-end; }
+.status-chip { cursor: pointer; }
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 </style>

@@ -98,10 +98,4 @@ onMounted(load)
 
 <style scoped>
 .sec-title { font-weight: 700; font-size: 15px; }
-.status-chip { display: inline-flex; align-items: center; padding: 1px 10px; border-radius: 10px; font-size: 12px; line-height: 18px; border: 1px solid; }
-.status-chip.st-not_started { background: #eef1f6; color: #5c6b84; border-color: #d8dfe9; }
-.status-chip.st-in_progress { background: #edf1ff; color: #3a63f0; border-color: #c8d5ff; }
-.status-chip.st-delayed { background: #fdeeee; color: #e64545; border-color: #f5bdbd; }
-.status-chip.st-completed { background: #eafaf2; color: #149a66; border-color: #b5ecd4; }
-.status-chip.st-suspended { background: #fff6e8; color: #d98200; border-color: #f7dbb1; }
 </style>

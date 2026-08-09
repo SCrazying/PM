@@ -72,29 +72,38 @@ async function onSubmit() {
 .login-wrap { display: flex; height: 100vh; }
 .login-left {
   flex: 1.2;
-  background: linear-gradient(135deg, #1b2540 0%, #2a3f6e 60%, #4f6ef7 130%);
+  background: linear-gradient(135deg, #0c2422 0%, #10312f 45%, #0ea5a4 130%);
   color: #fff;
   display: flex; align-items: center; justify-content: center;
   padding: 40px;
+  position: relative;
+  overflow: hidden;
 }
-.brand { max-width: 460px; }
+/* 背景装饰光圈 */
+.login-left::before, .login-left::after {
+  content: ''; position: absolute; border-radius: 50%;
+  background: radial-gradient(circle, rgba(20,184,166,.28) 0%, transparent 70%);
+}
+.login-left::before { width: 420px; height: 420px; top: -120px; right: -100px; }
+.login-left::after { width: 340px; height: 340px; bottom: -120px; left: -90px; background: radial-gradient(circle, rgba(99,102,241,.22) 0%, transparent 70%); }
+.brand { max-width: 460px; position: relative; z-index: 1; }
 .brand-logo {
   width: 64px; height: 64px; border-radius: 16px;
-  background: rgba(255,255,255,.14); backdrop-filter: blur(6px);
+  background: var(--pm-gradient); backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center;
   font-size: 26px; font-weight: 800; margin-bottom: 24px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.2);
+  box-shadow: 0 8px 24px rgba(0,0,0,.28);
 }
-.brand h1 { font-size: 34px; margin: 0 0 12px; font-weight: 800; }
+.brand h1 { font-size: 34px; margin: 0 0 12px; font-weight: 800; letter-spacing: .5px; }
 .brand p { font-size: 15px; opacity: .85; margin: 0 0 28px; }
 .feats { list-style: none; padding: 0; margin: 0; }
 .feats li { display: flex; align-items: center; font-size: 14px; opacity: .92; margin-bottom: 14px; }
 
 .login-right { flex: 1; display: flex; align-items: center; justify-content: center; background: var(--pm-bg); }
-.login-card { width: 380px; padding: 12px 6px; border: none; box-shadow: var(--pm-shadow-lg); }
+.login-card { width: 380px; padding: 14px 8px; border: none; box-shadow: var(--pm-shadow-lg); border-radius: 18px; }
 .title { font-size: 24px; font-weight: 800; text-align: center; }
 .subtitle { text-align: center; color: var(--pm-text-3); margin: 6px 0 26px; }
-.btn { width: 100%; margin-top: 6px; height: 44px; font-size: 16px; }
+.btn { width: 100%; margin-top: 6px; height: 44px; font-size: 16px; letter-spacing: 4px; }
 .tip { text-align: center; color: var(--pm-text-3); font-size: 12px; margin-top: 16px; }
 
 @media (max-width: 860px) { .login-left { display: none; } }

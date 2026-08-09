@@ -2,21 +2,25 @@
   <div v-loading="loading">
     <!-- 头部卡片 -->
     <div v-if="project" class="pm-card head-card">
-      <div class="pm-flex-between">
-        <div>
+      <div class="pm-flex-between head-top">
+        <div class="head-left">
           <div class="pname">
             {{ project.name }}
+            <span class="status-chip" :class="'st-' + project.status" style="margin-left:10px">{{ statusMap[project.status] }}</span>
             <el-tag size="small" effect="plain" style="margin-left:8px">{{ project.machine_model || '无机型' }}</el-tag>
           </div>
-          <div class="pmeta">编号 {{ project.code }} ｜ 负责人 {{ ownerName }} ｜ {{ statusMap[project.status] }}</div>
+          <div class="pmeta">编号 {{ project.code }}<span class="pmeta-sep">·</span>负责人 {{ ownerName }}</div>
         </div>
         <div class="pm-flex pm-gap">
           <div class="proj-comp">
             <div class="proj-comp-num">{{ projComp.percent }}<span class="pc-pct">%</span></div>
-            <div class="proj-comp-label">项目完成度 {{ projComp.passed }}/{{ projComp.total }} 节点</div>
+            <div class="proj-comp-label">完成度 {{ projComp.passed }}/{{ projComp.total }} 节点</div>
+            <div class="proj-comp-track"><div class="proj-comp-fill" :style="{ width: projComp.percent + '%' }"></div></div>
           </div>
-          <el-button @click="openProjectEdit">编辑</el-button>
-          <el-button @click="$router.back()">返回</el-button>
+          <div class="head-actions">
+            <el-button @click="openProjectEdit">编辑</el-button>
+            <el-button @click="$router.back()">返回</el-button>
+          </div>
         </div>
       </div>
 
@@ -542,13 +546,28 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
-.head-card { padding-top: 20px; }
-.pname { font-size: 20px; font-weight: 800; display: flex; align-items: center; }
-.pmeta { color: var(--pm-text-3); margin-top: 8px; font-size: 13px; }
-.steps { margin-top: 22px; }
+.head-card { padding: 20px 22px; }
+.head-top { gap: 16px; flex-wrap: wrap; }
+.head-left { min-width: 0; }
+.pname { font-size: 22px; font-weight: 800; display: flex; align-items: center; flex-wrap: wrap; letter-spacing: .2px; }
+.pmeta { color: var(--pm-text-3); margin-top: 10px; font-size: 13px; display: flex; align-items: center; }
+.pmeta-sep { margin: 0 8px; color: var(--pm-border-strong); }
+.steps { margin-top: 24px; }
 .node-alert { margin-top: 14px; }
 .step { cursor: pointer; }
 .step.active :deep(.el-step__title) { color: var(--pm-primary); font-weight: 700; }
+.head-actions { display: flex; gap: 10px; }
+.proj-comp {
+  text-align: center; padding: 6px 18px 10px;
+  background: var(--pm-primary-lighter);
+  border: 1px solid var(--pm-primary-light);
+  border-radius: var(--pm-radius); min-width: 132px;
+}
+.proj-comp-num { font-size: 26px; font-weight: 800; color: var(--pm-primary); line-height: 1.1; }
+.pc-pct { font-size: 14px; }
+.proj-comp-label { font-size: 11px; color: var(--pm-text-2); margin-top: 3px; white-space: nowrap; }
+.proj-comp-track { height: 4px; border-radius: 4px; background: #d6ecec; margin-top: 8px; overflow: hidden; }
+.proj-comp-fill { height: 100%; border-radius: 4px; background: var(--pm-gradient); transition: width .4s ease; }
 .card-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; }
 .review-sec { margin-top: 14px; border-top: 1px solid var(--pm-border); padding-top: 10px; }
 .sec-h { font-weight: 700; font-size: 13px; color: var(--pm-text-2); margin-bottom: 8px; }
@@ -557,7 +576,7 @@ onMounted(loadAll)
 .goal-items { display: flex; flex-direction: column; gap: 3px; }
 .goal-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
 .goal-item:hover { background: var(--pm-primary-light); }
-.goal-item.done { background: #e9f9f0; }
+.goal-item.done { background: var(--pm-st-completed-bg); }
 .goal-item.done .gi-goal { color: var(--pm-success); text-decoration: line-through; }
 .goal-item .el-icon { color: var(--pm-primary); flex-shrink: 0; }
 .goal-item.done .el-icon { color: var(--pm-success); }
@@ -575,10 +594,10 @@ onMounted(loadAll)
 .progress-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .progress-plan { margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
 .risk { color: var(--pm-danger); font-size: 12px; white-space: pre-wrap; word-break: break-word; }
-.comp-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 12px; background: #f7f9fc; border-radius: 8px; }
+.comp-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px; background: var(--pm-primary-lighter); border: 1px solid var(--pm-primary-light); border-radius: 10px; }
 .comp-label { font-size: 12px; color: var(--pm-text-2); white-space: nowrap; }
 .comp-num { font-size: 12px; color: var(--pm-text-2); font-weight: 700; white-space: nowrap; }
-.subnode-box { margin-bottom: 12px; padding: 10px 14px; background: #fbfcff; border: 1px solid var(--pm-border); border-radius: 10px; }
+.subnode-box { margin-bottom: 12px; padding: 12px 16px; background: #f8fbfb; border: 1px solid var(--pm-border); border-radius: 10px; }
 .subnode-title { font-weight: 700; font-size: 13px; display: flex; align-items: center; }
 .subnode-row { display: flex; align-items: center; gap: 10px; padding: 6px 2px; border-bottom: 1px dashed var(--pm-border); }
 .subnode-row:last-child { border-bottom: none; }
@@ -586,8 +605,4 @@ onMounted(loadAll)
 .sn-name { font-size: 14px; }
 .sn-ops { margin-left: auto; display: flex; gap: 4px; }
 .subnode-empty { padding: 4px 0; }
-.proj-comp { text-align: center; padding-right: 14px; margin-right: 4px; border-right: 1px solid var(--pm-border); }
-.proj-comp-num { font-size: 26px; font-weight: 800; color: var(--pm-primary); line-height: 1; }
-.pc-pct { font-size: 14px; }
-.proj-comp-label { font-size: 11px; color: var(--pm-text-3); margin-top: 4px; white-space: nowrap; }
 </style>
