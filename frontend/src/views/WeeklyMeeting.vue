@@ -31,11 +31,15 @@
         </div>
         <div class="tb-right">
           <el-button @click="onReset">重置</el-button>
-          <el-popover v-if="view === 'project'" placement="bottom-start" :width="140" trigger="click">
+          <el-popover v-if="view === 'project'" placement="bottom-end" :width="200" trigger="click">
             <template #reference>
-              <el-button><el-icon style="margin-right:4px"><Setting /></el-icon>列设置</el-button>
+              <el-button><el-icon style="margin-right:4px"><Setting /></el-icon>设置</el-button>
             </template>
             <div class="col-settings">
+              <div class="cs-h">显示选项</div>
+              <el-checkbox v-model="dailyTodayOnly">仅显示今日每日进展</el-checkbox>
+              <el-divider style="margin:6px 0" />
+              <div class="cs-h">列显示</div>
               <el-checkbox v-for="c in colOptions" :key="c.key"
                            :model-value="visibleCols.includes(c.key)"
                            @change="(v) => toggleCol(c.key, v)">{{ c.label }}</el-checkbox>
@@ -187,6 +191,17 @@
             <div v-else class="goal-cell">{{ row.weekly_goal || '（未设周目标）' }}</div>
           </template>
         </el-table-column>
+        <el-table-column v-if="visibleCols.includes('today_plan')" label="今日目标" min-width="180">
+          <template #default="{ row }">
+            <div v-if="(row.today_plan || []).length" class="plan-inline">
+              <div v-for="(it, i) in row.today_plan" :key="i" class="plan-inline-item">
+                <span class="di-author">{{ it.author }}</span>
+                <span class="di-work">{{ it.plan }}</span>
+              </div>
+            </div>
+            <span v-else class="pm-sub">无</span>
+          </template>
+        </el-table-column>
         <el-table-column v-if="visibleCols.includes('daily')" label="每日进展" min-width="220">
           <template #default="{ row }">
             <div v-if="dailyItems(row).length" class="daily-inline">
@@ -269,9 +284,15 @@ const colOptions = [
   { key: 'current_node', label: '当前节点' },
   { key: 'subnodes', label: '子节点' },
   { key: 'goals', label: '周目标' },
+  { key: 'today_plan', label: '今日目标' },
   { key: 'daily', label: '每日进展' },
 ]
 const visibleCols = computed(() => viewFilters.columns.weekly)
+// 显示选项：仅今日每日进展（持久化）
+const dailyTodayOnly = computed({
+  get: () => viewFilters.weekly.dailyTodayOnly ?? false,
+  set: (v) => { viewFilters.weekly.dailyTodayOnly = v },
+})
 function toggleCol(key, on) {
   const cur = new Set(viewFilters.columns.weekly)
   if (on) cur.add(key); else cur.delete(key)
@@ -363,7 +384,9 @@ const shortDate = (d) => (d ? String(d).slice(5) : '')
 
 // 每日进展列：把 p.daily 展平成有序列表（日期倒序）；有风险的进展固定排最后一行，且不被截断
 function dailyItems(row) {
-  const dates = Object.keys(row.daily || {}).sort().reverse()
+  const todayIso = new Date().toISOString().slice(0, 10)
+  let dates = Object.keys(row.daily || {}).sort().reverse()
+  if (dailyTodayOnly.value) dates = dates.filter((d) => d === todayIso)
   const items = []
   for (const d of dates) {
     for (const it of row.daily[d] || []) {
@@ -440,7 +463,9 @@ async function onToggleSub(s) {
 async function downloadLedger(type = 'weekly') {
   exporting.value = true
   try {
-    const response = await exportLedger(weekStart.value, type)
+    // 本周台账按当前列启用状态导出（含今日目标列是否勾选）
+    const cols = type === 'weekly' ? visibleCols.value.join(',') : undefined
+    const response = await exportLedger(weekStart.value, type, cols)
     const blob = new Blob([response], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -473,6 +498,9 @@ onMounted(async () => {
 .desc-cell { white-space: pre-wrap; word-break: break-word; line-height: 1.5; color: var(--pm-text-2); font-size: 12.5px; }
 .col-settings { display: flex; flex-direction: column; gap: 6px; }
 .col-settings .el-checkbox { margin-right: 0; }
+.cs-h { font-size: 12px; font-weight: 600; color: var(--pm-text-3); margin: 2px 0; }
+.plan-inline { display: flex; flex-direction: column; gap: 4px; }
+.plan-inline-item { display: flex; align-items: flex-start; gap: 5px; font-size: 12.5px; line-height: 1.5; }
 .role-summary { white-space: pre-line; line-height: 1.45; font-size: 12px; }
 .node-deadline { margin-top: 3px; }
 .report-body { padding: 6px 4px; }

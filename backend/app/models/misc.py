@@ -57,10 +57,13 @@ class WeeklyGoalItem(IdMixin, TimestampMixin, Base):
 
 
 class Attachment(IdMixin, SoftDeleteMixin, Base):
+    """附件/项目资料。节点/任务/评审附件（category=attachment）或项目级资料（category=资料分类）。
+    项目级资料：node/task/review 均为空，category 取 需求矩阵/方案设计/验证报告/其他。"""
     __tablename__ = "attachment"
     __table_args__ = (
         CheckConstraint(
-            "project_node_id IS NOT NULL OR task_id IS NOT NULL OR review_id IS NOT NULL",
+            "project_node_id IS NOT NULL OR task_id IS NOT NULL OR review_id IS NOT NULL "
+            "OR category IS NOT NULL",
             name="ck_attachment_owner",
         ),
     )
@@ -69,12 +72,17 @@ class Attachment(IdMixin, SoftDeleteMixin, Base):
     project_node_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("project_node.id", ondelete="RESTRICT"))
     task_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("task.id", ondelete="RESTRICT"))
     review_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("node_review.id", ondelete="RESTRICT"))
+    category: Mapped[str | None] = mapped_column(String(32))  # 资料分类；空=节点/任务/评审附件
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)
     file_size: Mapped[int | None] = mapped_column(BigInteger)
     mime_type: Mapped[str | None] = mapped_column(String(64))
     uploaded_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("user.id", ondelete="RESTRICT"))
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# 项目资料分类（详情页「资料」区下拉）
+ATTACHMENT_CATEGORIES = ("需求矩阵", "方案设计", "验证报告", "其他")
 
 
 class AiSummary(IdMixin, TimestampMixin, Base):

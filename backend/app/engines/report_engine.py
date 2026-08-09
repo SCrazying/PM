@@ -112,6 +112,20 @@ class ReportService:
                 risks.append({"progress_id": p.id, "date": d, "author": uname, "risk": p.risk,
                               "resolved": p.risk_resolved})
 
+        # 今日目标：昨天报工时填的"明日计划"（若昨天是周末，顺延取上一工作日），便于周会过今日安排
+        tp_date = date.today() - timedelta(days=1)
+        while tp_date.weekday() >= 5:
+            tp_date -= timedelta(days=1)
+        today_plan = [{
+            "author": uname, "plan": p.tomorrow_plan, "date": p.progress_date.isoformat(),
+        } for p, uname in self.db.execute(
+            select(Progress, User.display_name).join(User, User.id == Progress.author_id).where(
+                Progress.project_id == project_id, Progress.progress_date == tp_date,
+                Progress.is_deleted.is_(False), Progress.tomorrow_plan.isnot(None),
+                Progress.tomorrow_plan != "",
+            ).order_by(Progress.id)
+        ).all()]
+
         # 全部一级节点（周会"当前节点"列显示所有节点，每行一个）
         top_nodes = self.db.execute(
             select(ProjectNode).where(
@@ -194,6 +208,7 @@ class ReportService:
             "weekly_goal_items": goal_items,
             "tasks": week_tasks,
             "daily": daily,
+            "today_plan": today_plan,
             "risks": risks,
             "subnodes": subnodes,
             "node_subnodes": node_subnodes,
@@ -209,9 +224,17 @@ class ReportService:
                 "weekly_goal": self.project_weekly(p.id, week_start)["weekly_goal"]} for p in projects]
 
     # ---------- 项目台账 Excel 导出（M5） ----------
-    def export_ledger_xlsx(self, week_start: date, scope: str = "weekly") -> BytesIO:
+    # 本周台账列定义（key 与周会视图列设置一致；列宽）
+    WEEKLY_COLS = [
+        ("machine", "机型", 14), ("name", "项目名称", 22), ("description", "项目描述", 26),
+        ("status", "状态", 10), ("roles", "项目角色", 24), ("current_node", "当前节点", 26),
+        ("subnodes", "子节点", 30), ("goals", "周目标", 32), ("today_plan", "今日目标", 30),
+        ("daily", "每日进展", 50),
+    ]
+
+    def export_ledger_xlsx(self, week_start: date, scope: str = "weekly", columns=None) -> BytesIO:
         """导出项目台账 Excel。
-        scope=weekly：本周台账，与周会视图「按项目」视图列结构一致（每项目一行）；
+        scope=weekly：本周台账，与周会视图「按项目」视图列结构一致（每项目一行），columns 指定启用列；
         scope=all：项目台账（每周任务合集），保持按成员一行的历史格式。"""
         ws_start, ws_end = self._week_range(week_start)
         wb = Workbook()
@@ -242,9 +265,10 @@ class ReportService:
         if scope == "weekly":
             status_labels = {"not_started": "未开始", "in_progress": "进行中", "delayed": "延期",
                              "completed": "已完成", "suspended": "暂停"}
-            headers = ["机型", "项目名称", "项目描述", "状态", "项目角色", "当前节点", "子节点", "周目标", "每日进展"]
-            widths = [14, 22, 26, 10, 24, 26, 30, 32, 50]
-            _header(headers, widths, "本周台账")
+            # 启用列（默认全部；前端按列设置传入启用的 key）
+            enabled = columns if columns else [k for k, _, _ in self.WEEKLY_COLS]
+            active = [c for c in self.WEEKLY_COLS if c[0] in enabled]
+            _header([label for _, label, _ in active], [w for _, _, w in active], "本周台账")
 
             def short(d):
                 return d.isoformat()[5:] if d else ""
@@ -299,21 +323,29 @@ class ReportService:
                         lines.append(f"{d[5:]} {it['author']}：{it['today_work']}{risk}")
                 return "\n".join(lines) or "无"
 
+            def fmt_today_plan(items):
+                """今日目标列：昨天报工时填的明日计划"""
+                lines = [f"{it['author']}：{it['plan']}" for it in items]
+                return "\n".join(lines) or "无"
+
+            col_val = {
+                "machine": lambda prj, data: prj["machine_model"] or "",
+                "name": lambda prj, data: prj["name"],
+                "description": lambda prj, data: prj["description"] or "",
+                "status": lambda prj, data: status_labels.get(prj["status"], prj["status"]),
+                "roles": lambda prj, data: prj["project_roles"] or "",
+                "current_node": lambda prj, data: fmt_nodes(prj["nodes"]),
+                "subnodes": lambda prj, data: fmt_subnodes(data["subnodes"]),
+                "goals": lambda prj, data: fmt_goals(data["weekly_goal_items"], data["weekly_goal"]),
+                "today_plan": lambda prj, data: fmt_today_plan(data["today_plan"]),
+                "daily": lambda prj, data: fmt_daily(data["daily"]),
+            }
+
             row_no = 2
             for project in projects:
                 data = self.project_weekly(project.id, ws_start)
                 prj = data["project"]
-                values = [
-                    prj["machine_model"] or "",
-                    prj["name"],
-                    prj["description"] or "",
-                    status_labels.get(prj["status"], prj["status"]),
-                    prj["project_roles"] or "",
-                    fmt_nodes(prj["nodes"]),
-                    fmt_subnodes(data["subnodes"]),
-                    fmt_goals(data["weekly_goal_items"], data["weekly_goal"]),
-                    fmt_daily(data["daily"]),
-                ]
+                values = [col_val[key](prj, data) for key, _, _ in active]
                 for col, value in enumerate(values, start=1):
                     cell = ws.cell(row=row_no, column=col, value=value)
                     cell.alignment = Alignment(vertical="top", wrap_text=True)

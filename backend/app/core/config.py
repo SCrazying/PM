@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./data/uploads"
     ATTACHMENT_MAX_MB: int = 50
 
+    # 对象存储（项目资料）：backend=local 用本地磁盘（UPLOAD_DIR）；minio 用 MinIO
+    # 后期切换正式文件系统时，仅改 .env 即可，代码无需变更
+    STORAGE_BACKEND: str = "local"          # local / minio
+    MINIO_ENDPOINT: str = ""                 # 如 127.0.0.1:9000
+    MINIO_ACCESS_KEY: str = ""
+    MINIO_SECRET_KEY: str = ""
+    MINIO_BUCKET: str = "pm-system"
+    MINIO_SECURE: bool = False
+
     # 备份
     BACKUP_DIR: str = "./data/backups"
 

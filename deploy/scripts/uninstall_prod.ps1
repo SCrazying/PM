@@ -14,6 +14,15 @@ Write-Host "==> 停止并删除服务 $ServiceName ..." -ForegroundColor Yellow
 Start-Sleep -Seconds 2
 & $Nssm remove $ServiceName confirm
 
+# 同时清理 MinIO 对象存储服务（若存在）
+$MinioService = "$ServiceName-minio"
+if ($null -ne (Get-Service -Name $MinioService -ErrorAction SilentlyContinue)) {
+    Write-Host "==> 停止并删除服务 $MinioService ..." -ForegroundColor Yellow
+    & $Nssm stop $MinioService 2>$null | Out-Null
+    Start-Sleep -Seconds 2
+    & $Nssm remove $MinioService confirm 2>$null | Out-Null
+}
+
 if (-not $KeepData) {
     $dataDir = Join-Path $Root "data"
     if (Test-Path $dataDir) {

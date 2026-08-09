@@ -124,10 +124,13 @@ def group_weekly(view: str = Query("project"), week_start: date = Query(...), us
 
 @router.get("/reports/group/ledger/export")
 def export_ledger(week_start: date = Query(...), type: str = Query("weekly"),
+                  columns: str = Query(None),
                   user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """导出台账：type=weekly 本周台账 / type=project 项目台账(每周任务合集) / type=completion 项目完成台账。"""
+    """导出台账：type=weekly 本周台账 / type=project 项目台账(每周任务合集) / type=completion 项目完成台账。
+    columns：逗号分隔的启用列 key（仅 weekly 生效，空=全部列），与周会视图列设置一致。"""
     from urllib.parse import quote
     svc = ReportService(db)
+    cols = [c.strip() for c in columns.split(",") if c.strip()] if columns else None
     if type == "completion":
         filename = "项目完成台账.xlsx"
         output = svc.export_completion_xlsx()
@@ -136,7 +139,7 @@ def export_ledger(week_start: date = Query(...), type: str = Query("weekly"),
         output = svc.export_ledger_xlsx(week_start, scope="all")
     else:
         filename = f"本周台账_{week_start.isocalendar().year}年第{week_start.isocalendar().week:02d}周.xlsx"
-        output = svc.export_ledger_xlsx(week_start, scope="weekly")
+        output = svc.export_ledger_xlsx(week_start, scope="weekly", columns=cols)
     record_audit(db, user["user_id"], "export", "project_ledger", None, {"week_start": str(week_start), "type": type})
     return StreamingResponse(
         output,

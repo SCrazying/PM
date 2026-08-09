@@ -290,6 +290,7 @@ CREATE TABLE attachment (
     project_node_id BIGINT REFERENCES project_node(id) ON DELETE RESTRICT,
     task_id         BIGINT REFERENCES task(id)        ON DELETE RESTRICT,
     review_id       BIGINT REFERENCES node_review(id) ON DELETE RESTRICT,
+    category        VARCHAR(32),                                   -- 资料分类（需求矩阵/方案设计/验证报告/其他）；空=节点/任务/评审附件
     file_name       VARCHAR(255) NOT NULL,
     file_path       VARCHAR(512) NOT NULL,
     file_size       BIGINT,
@@ -299,7 +300,7 @@ CREATE TABLE attachment (
     is_deleted      BOOLEAN NOT NULL DEFAULT FALSE,
     deleted_at      TIMESTAMPTZ,
     CONSTRAINT ck_attachment_owner CHECK (
-        project_node_id IS NOT NULL OR task_id IS NOT NULL OR review_id IS NOT NULL
+        project_node_id IS NOT NULL OR task_id IS NOT NULL OR review_id IS NOT NULL OR category IS NOT NULL
     )
 );
 CREATE INDEX ix_attachment_project ON attachment(project_id)      WHERE NOT is_deleted;

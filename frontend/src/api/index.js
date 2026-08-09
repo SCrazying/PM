@@ -60,7 +60,8 @@ export const deleteWeeklyGoalItem = (id) => request.delete(`/weekly-goal-items/$
 // 周报 / 看板
 export const projectWeekly = (projectId, week_start) => request.get(`/reports/projects/${projectId}/weekly`, { params: { week_start } })
 export const groupWeekly = (view, week_start) => request.get('/reports/group/weekly', { params: { view, week_start } })
-export const exportLedger = (week_start, type = 'weekly') => request.get('/reports/group/ledger/export', { params: { week_start, type }, responseType: 'blob' })
+export const exportLedger = (week_start, type = 'weekly', columns) =>
+  request.get('/reports/group/ledger/export', { params: { week_start, type, columns }, responseType: 'blob' })
 export const getBoard = (params) => request.get('/board', { params })
 export const getBoardSummary = () => request.get('/board/summary')
 
@@ -77,7 +78,9 @@ export const editAiSummary = (id, data) => request.put(`/ai-summaries/${id}`, da
 
 // 附件
 export const uploadAttachment = (formData) => request.post('/attachments', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const listAttachments = (projectId) => request.get(`/projects/${projectId}/attachments`)
 export const downloadAttachment = (id) => `/api/v1/attachments/${id}/download`
+export const deleteAttachment = (id) => request.delete(`/attachments/${id}`)
 
 // 用户 / 配置 / 备份 / 导入
 export const listUsers = () => request.get('/users')

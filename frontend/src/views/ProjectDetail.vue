@@ -163,6 +163,8 @@
           </div>
         </div>
 
+        <ProjectFiles :project-id="pid" :owner-id="project?.owner_id" />
+
         <div class="pm-card" style="margin-top:14px">
           <div class="card-title" style="margin-bottom:8px">进展时间线</div>
           <el-timeline v-if="progressList.length" class="ptl">
@@ -309,6 +311,7 @@ import {
 } from '../api'
 import { useUserStore } from '../store/user'
 import ProjectForm from '../components/ProjectForm.vue'
+import ProjectFiles from '../components/ProjectFiles.vue'
 
 const route = useRoute()
 const store = useUserStore()

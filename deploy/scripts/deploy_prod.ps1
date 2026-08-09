@@ -9,7 +9,10 @@ param(
     [string]$AppUser = "pm",
     [string]$AppPassword = "pm123",  # 数据库应用密码（内网统一 postgres）
     [string]$DbName = "pm_system",
-    [string]$JwtSecret = ""             # 不填则自动生成随机密钥
+    [string]$JwtSecret = "",            # 不填则自动生成随机密钥
+    [int]$MinioPort = 9000,             # MinIO 对象存储 S3 端口（项目资料）
+    [int]$MinioConsolePort = 9001,      # MinIO 控制台端口
+    [switch]$NoMinio                    # 跳过 MinIO 服务（用本地磁盘存资料）
 )
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -72,7 +75,7 @@ if (Test-Path $envFile) { $content = Get-Content $envFile -Raw }
 $lines = @()
 foreach ($line in ($content -split "`n")) {
     $k = ($line -split "=")[0].Trim()
-    if ($k -in @("APP_ENV","DATABASE_URL","JWT_SECRET","AI_BASE_URL","AI_API_KEY","CORS_ORIGINS","UPLOAD_DIR","BACKUP_DIR")) { continue }
+    if ($k -in @("APP_ENV","DATABASE_URL","JWT_SECRET","AI_BASE_URL","AI_API_KEY","CORS_ORIGINS","UPLOAD_DIR","BACKUP_DIR","STORAGE_BACKEND","MINIO_ENDPOINT","MINIO_ACCESS_KEY","MINIO_SECRET_KEY","MINIO_BUCKET","MINIO_SECURE")) { continue }
     if ($line.Trim()) { $lines += $line.TrimEnd("`r") }
 }
 $lines += "APP_ENV=prod"
@@ -84,6 +87,19 @@ $lines += "AI_API_KEY="
 $lines += "CORS_ORIGINS="
 $lines += "UPLOAD_DIR=$Root\data\uploads"
 $lines += "BACKUP_DIR=$Root\data\backups"
+# MinIO 对象存储（项目资料）：minio.exe 存在且未 -NoMinio 时启用
+$MinioExe = Join-Path $Root "runtime\minio\minio.exe"
+$useMinio = (-not $NoMinio) -and (Test-Path $MinioExe)
+if ($useMinio) {
+    $lines += "STORAGE_BACKEND=minio"
+    $lines += "MINIO_ENDPOINT=127.0.0.1:$MinioPort"
+    $lines += "MINIO_ACCESS_KEY=pm"
+    $lines += "MINIO_SECRET_KEY=pmsecret123"
+    $lines += "MINIO_BUCKET=pm-system"
+    $lines += "MINIO_SECURE=false"
+} else {
+    $lines += "STORAGE_BACKEND=local"
+}
 Set-Content -Path $envFile -Value ($lines -join "`r`n") -Encoding UTF8
 Write-Host "[配置] 已生成 $envFile（JWT_SECRET 已随机）" -ForegroundColor Green
 
@@ -135,6 +151,42 @@ if ($LASTEXITCODE -ne 0) {
 & $Nssm set $ServiceName AppRotateBytes 10485760
 & $Nssm set $ServiceName AppExit Default Restart
 & $Nssm set $ServiceName AppRestartDelay 5000
+
+# ---------- 3.6 MinIO 对象存储服务（项目资料） ----------
+$MinioService = "$ServiceName-minio"
+if ($useMinio) {
+    Write-Host "[MinIO] 注册对象存储服务 $MinioService ..." -ForegroundColor Yellow
+    New-Item -ItemType Directory -Force -Path "$Root\data\minio" | Out-Null
+    $mSvc = $null -ne (Get-Service -Name $MinioService -ErrorAction SilentlyContinue)
+    if ($mSvc) {
+        & $Nssm stop $MinioService 2>$null | Out-Null
+        Start-Sleep -Seconds 1
+        & $Nssm remove $MinioService confirm 2>$null | Out-Null
+        Start-Sleep -Seconds 1
+    }
+    & $Nssm install $MinioService "`"$MinioExe`""
+    & $Nssm set $MinioService AppDirectory $Root
+    & $Nssm set $MinioService AppParameters "server `"$Root\data\minio`" --address :$MinioPort --console-address :$MinioConsolePort"
+    & $Nssm set $MinioService DisplayName "PM-System MinIO 对象存储"
+    & $Nssm set $MinioService Description "PM-System 项目资料对象存储（S3 兼容）"
+    & $Nssm set $MinioService Start SERVICE_AUTO_START
+    & $Nssm set $MinioService AppStdout "$Root\data\logs\minio.log"
+    & $Nssm set $MinioService AppStderr "$Root\data\logs\minio.err"
+    & $Nssm set $MinioService AppRotateFiles 1
+    & $Nssm set $MinioService AppRestartDelay 5000
+    # MinIO 根账号（与 .env 一致）
+    & $Nssm set $MinioService AppEnvironmentExtra "MINIO_ROOT_USER=pm" "MINIO_ROOT_PASSWORD=pmsecret123" | Out-Null
+    & $Nssm start $MinioService | Out-Null
+    Start-Sleep -Seconds 3
+    $minioOk = try { (Invoke-WebRequest -Uri "http://127.0.0.1:$MinioPort/minio/health/live" -UseBasicParsing -TimeoutSec 6).StatusCode } catch { 0 }
+    if ($minioOk -eq 200) {
+        Write-Host "[MinIO] 已启动（S3: http://127.0.0.1:$MinioPort  控制台: http://127.0.0.1:$MinioConsolePort  账号 pm/pmsecret123）" -ForegroundColor Green
+    } else {
+        Write-Host "[MinIO] 服务已注册但健康检查未通过（HTTP $minioOk），资料存储将回退本地磁盘；可看 data\logs\minio.err" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "[MinIO] 跳过（未启用），资料存储用本地磁盘 $Root\data\uploads" -ForegroundColor DarkGray
+}
 
 # ---------- 3.5 防火墙放行端口（内网同事可访问） ----------
 Write-Host "[防火墙] 放行 TCP $Port ..." -ForegroundColor Yellow

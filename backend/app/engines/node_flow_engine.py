@@ -198,14 +198,18 @@ class NodeFlowService:
                 "percent": round(done / total * 100) if total else 100}
 
     def project_completion(self, project_id: int) -> dict:
-        """项目完成度：已通过节点 / 总节点。"""
+        """项目完成度：已通过一级节点 / 一级节点总数（不含子节点；子节点状态为 done 不是 passed，计入会拉低）。无节点给 100%。"""
         nodes = list(self.db.execute(
-            select(ProjectNode).where(ProjectNode.project_id == project_id, ProjectNode.is_deleted.is_(False))
+            select(ProjectNode).where(
+                ProjectNode.project_id == project_id,
+                ProjectNode.parent_id.is_(None),
+                ProjectNode.is_deleted.is_(False),
+            )
         ).scalars().all())
         total = len(nodes)
         passed = sum(1 for n in nodes if n.status == "passed")
         return {"project_id": project_id, "total": total, "passed": passed,
-                "percent": round(passed / total * 100) if total else 0}
+                "percent": round(passed / total * 100) if total else 100}
 
     def complete_node(self, node_id: int, user: dict) -> ProjectNode:
         """负责人/管理员直接完成节点（置 passed + actual_end + 维护 current_node_id）。

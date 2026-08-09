@@ -15,10 +15,12 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_admin, require_self_or_admin
-from app.core.responses import BizException, NotFoundError, ok, page_result
+from app.core.responses import BizException, ForbiddenError, NotFoundError, ok, page_result
+from app.core.storage import get_storage
 from app.engines.ai_engine import AiService
 from app.models.misc import Attachment, Config
-from app.models.project import TrTemplate, TrTemplateNode
+from app.models.project import Project, TrTemplate, TrTemplateNode
+from app.models.user import User
 from app.schemas.project import RecycleBatchIn
 from app.services.audit_service import record_audit
 from app.services.personal_service import PersonalService
@@ -70,13 +72,21 @@ ALLOWED_EXT = set((os.environ.get("ATTACH_EXT") or
                    "pdf,doc,docx,xls,xlsx,ppt,pptx,txt,md,png,jpg,jpeg,zip").split(","))
 
 
+def _save_upload(file: UploadFile, content: bytes) -> str:
+    """存储到当前后端（本地磁盘 / MinIO），返回 file_path。"""
+    import uuid
+    key = f"{uuid.uuid4().hex}_{file.filename}"
+    return get_storage().put(key, content)
+
+
 @router.post("/attachments")
 async def upload_attachment(project_id: int = Form(...), project_node_id: int = Form(None),
                             task_id: int = Form(None), review_id: int = Form(None),
+                            category: str = Form(None),
                             file: UploadFile = File(...),
                             user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    if not (project_node_id or task_id or review_id):
-        raise BizException("附件须关联节点/任务/评审之一")
+    if not (project_node_id or task_id or review_id or category):
+        raise BizException("附件须关联节点/任务/评审之一，或指定资料分类")
     ext = (file.filename.rsplit(".", 1)[-1] or "").lower()
     if ext not in ALLOWED_EXT:
         raise BizException(f"不支持的文件类型 .{ext}")
@@ -84,15 +94,9 @@ async def upload_attachment(project_id: int = Form(...), project_node_id: int = 
     if len(content) > settings.ATTACHMENT_MAX_MB * 1024 * 1024:
         raise BizException(f"文件超过 {settings.ATTACHMENT_MAX_MB}MB")
 
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    import uuid
-    fname = f"{uuid.uuid4().hex}_{file.filename}"
-    fpath = os.path.join(settings.UPLOAD_DIR, fname)
-    with open(fpath, "wb") as f:
-        f.write(content)
-
+    fpath = _save_upload(file, content)
     att = Attachment(project_id=project_id, project_node_id=project_node_id, task_id=task_id,
-                     review_id=review_id, file_name=file.filename, file_path=fpath,
+                     review_id=review_id, category=category, file_name=file.filename, file_path=fpath,
                      file_size=len(content), mime_type=file.content_type, uploaded_by=user["user_id"])
     db.add(att)
     db.commit()
@@ -100,13 +104,52 @@ async def upload_attachment(project_id: int = Form(...), project_node_id: int = 
     return ok({"id": att.id, "file_name": att.file_name}, message="上传成功")
 
 
+@router.get("/projects/{project_id}/attachments")
+def list_attachments(project_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """项目资料/附件列表（含上传人姓名）。"""
+    rows = db.execute(
+        select(Attachment, User.display_name)
+        .join(User, User.id == Attachment.uploaded_by, isouter=True)
+        .where(Attachment.project_id == project_id, Attachment.is_deleted.is_(False))
+        .order_by(Attachment.uploaded_at.desc())
+    ).all()
+    return ok([{
+        "id": a.id, "file_name": a.file_name, "file_size": a.file_size, "mime_type": a.mime_type,
+        "category": a.category, "project_node_id": a.project_node_id, "task_id": a.task_id,
+        "review_id": a.review_id, "uploaded_by": a.uploaded_by, "uploaded_by_name": uname,
+        "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
+    } for a, uname in rows])
+
+
 @router.get("/attachments/{aid}/download")
 def download_attachment(aid: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     att = db.get(Attachment, aid)
-    if not att or att.is_deleted or not os.path.exists(att.file_path):
+    if not att or att.is_deleted:
         raise NotFoundError("附件不存在")
+    path = get_storage().get_path(att.file_path)
+    if not os.path.exists(path):
+        raise NotFoundError("附件文件缺失")
     record_audit(db, user["user_id"], "export", "attachment", str(aid), {"file": att.file_name})
-    return FileResponse(att.file_path, filename=att.file_name)
+    return FileResponse(path, filename=att.file_name)
+
+
+@router.delete("/attachments/{aid}")
+def delete_attachment(aid: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """删除附件（软删）：上传人 / 项目负责人 / 管理员。"""
+    att = db.get(Attachment, aid)
+    if not att or att.is_deleted:
+        raise NotFoundError("附件不存在")
+    project = db.get(Project, att.project_id)
+    if not (user["role"] == "admin" or (project and project.owner_id == user["user_id"])
+            or att.uploaded_by == user["user_id"]):
+        raise ForbiddenError("仅上传人/负责人/管理员可删除")
+    att.is_deleted = True
+    from datetime import datetime, timezone
+    att.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    get_storage().delete(att.file_path)
+    record_audit(db, user["user_id"], "delete", "attachment", str(aid), {"file": att.file_name})
+    return ok(message="已删除")
 
 
 # ---------- 配置 ----------

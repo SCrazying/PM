@@ -8,13 +8,13 @@ const STORAGE_KEY = 'pm-view-filters'
 const DEFAULTS = () => ({
   board: { machine_model: '' },
   projectList: { keyword: '', status: '', machine_model: '', page: 1, size: 10, sort_field: 'id', sort_order: 'desc' },
-  weekly: { weekStart: new Date().toISOString().slice(0, 10), filterMachine: '', view: 'project', filterPerson: '', filterRole: '', filterStatus: 'in_progress' },
+  weekly: { weekStart: new Date().toISOString().slice(0, 10), filterMachine: '', view: 'project', filterPerson: '', filterRole: '', filterStatus: 'in_progress', dailyTodayOnly: false },
 })
 
 // 各视图默认可见列（操作列/展开列固定展示，不进列表）
 const DEFAULT_COLUMNS = {
   projectList: ['name', 'description', 'machine_model', 'current_node', 'status'],
-  weekly: ['machine', 'name', 'description', 'status', 'roles', 'current_node', 'subnodes', 'goals', 'daily'],
+  weekly: ['machine', 'name', 'description', 'status', 'roles', 'current_node', 'subnodes', 'goals', 'today_plan', 'daily'],
 }
 
 function loadSaved() {
