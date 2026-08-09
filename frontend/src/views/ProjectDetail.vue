@@ -581,7 +581,9 @@ onMounted(loadAll)
 .review-item { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 6px; }
 .goal-text { font-size: 14px; line-height: 1.6; }
 .goal-items { display: flex; flex-direction: column; gap: 3px; }
-.goal-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.goal-item { display: flex; align-items: flex-start; gap: 6px; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.goal-item .el-icon { margin-top: 2px; }
+.goal-item .gi-date, .goal-item .gi-owner { margin-top: 1px; }
 .goal-item:hover { background: var(--pm-primary-light); }
 .goal-item.done { background: var(--pm-st-completed-bg); }
 .goal-item.done .gi-goal { color: var(--pm-success); text-decoration: line-through; }

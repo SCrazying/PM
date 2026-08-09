@@ -11,26 +11,38 @@
         </el-select>
         <el-button type="primary" @click="load">查询</el-button>
         <el-button @click="onReset">重置</el-button>
+        <el-popover placement="bottom-start" :width="140" trigger="click">
+          <template #reference>
+            <el-button><el-icon style="margin-right:4px"><Setting /></el-icon>列设置</el-button>
+          </template>
+          <div class="col-settings">
+            <el-checkbox v-for="c in colOptions" :key="c.key"
+                         :model-value="visibleCols.includes(c.key)"
+                         @change="(v) => toggleCol(c.key, v)">{{ c.label }}</el-checkbox>
+            <el-divider style="margin:6px 0" />
+            <el-button size="small" type="primary" plain style="width:100%" @click="onResetCols">恢复默认</el-button>
+          </div>
+        </el-popover>
       </div>
       <el-button type="success" @click="openCreate"><el-icon style="margin-right:4px"><Plus /></el-icon>新建项目</el-button>
     </div>
 
     <el-table :data="rows" v-loading="loading" stripe @sort-change="onSortChange">
-      <el-table-column prop="name" label="项目名称" min-width="200" sortable="custom">
+      <el-table-column v-if="visibleCols.includes('name')" prop="name" label="项目名称" min-width="200" sortable="custom">
         <template #default="{ row }">
           <el-link type="primary" @click="goDetail(row)">{{ row.name }}</el-link>
         </template>
       </el-table-column>
-      <el-table-column prop="description" label="项目描述" min-width="240" sortable="custom">
+      <el-table-column v-if="visibleCols.includes('description')" prop="description" label="项目描述" min-width="240" sortable="custom">
         <template #default="{ row }">
           <div class="desc-cell">{{ row.description || '—' }}</div>
         </template>
       </el-table-column>
-      <el-table-column prop="machine_model" label="机型" width="96" sortable="custom" />
-      <el-table-column label="当前节点" width="150">
+      <el-table-column v-if="visibleCols.includes('machine_model')" prop="machine_model" label="机型" width="96" sortable="custom" />
+      <el-table-column v-if="visibleCols.includes('current_node')" label="当前节点" width="150">
         <template #default="{ row }">{{ nodeCache[row.id] || '—' }}</template>
       </el-table-column>
-      <el-table-column prop="status" label="状态" width="132" sortable="custom">
+      <el-table-column v-if="visibleCols.includes('status')" prop="status" label="状态" width="132" sortable="custom">
         <template #default="{ row }">
           <el-dropdown v-if="canEditStatus(row)" trigger="click" @command="(v) => onStatusChange(row, v)">
             <span class="status-chip" :class="'st-' + row.status">
@@ -66,7 +78,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteProject, getProject, listMachineOptions, listProjects, updateProject } from '../api'
@@ -84,6 +96,22 @@ const nodeCache = ref({})
 const machineOptions = ref([])
 const viewFilters = useViewFilterStore()
 const query = viewFilters.projectList
+
+// 列显示/隐藏（操作列固定展示；配置持久化到 localStorage）
+const colOptions = [
+  { key: 'name', label: '项目名称' },
+  { key: 'description', label: '项目描述' },
+  { key: 'machine_model', label: '机型' },
+  { key: 'current_node', label: '当前节点' },
+  { key: 'status', label: '状态' },
+]
+const visibleCols = computed(() => viewFilters.columns.projectList)
+function toggleCol(key, on) {
+  const cur = new Set(viewFilters.columns.projectList)
+  if (on) cur.add(key); else cur.delete(key)
+  viewFilters.columns.projectList = [...cur]
+}
+function onResetCols() { viewFilters.resetColumns('projectList') }
 
 // 重置筛选回默认值（关键词/状态/机型/排序/页码）
 function onReset() {
@@ -176,4 +204,6 @@ onMounted(async () => {
 .status-chip { cursor: pointer; }
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 .desc-cell { white-space: pre-wrap; word-break: break-word; line-height: 1.5; color: var(--pm-text-2); font-size: 12.5px; }
+.col-settings { display: flex; flex-direction: column; gap: 6px; }
+.col-settings .el-checkbox { margin-right: 0; }
 </style>

@@ -28,6 +28,18 @@
           </el-select>
         </template>
         <el-button @click="onReset">重置</el-button>
+        <el-popover v-if="view === 'project'" placement="bottom-start" :width="140" trigger="click">
+          <template #reference>
+            <el-button><el-icon style="margin-right:4px"><Setting /></el-icon>列设置</el-button>
+          </template>
+          <div class="col-settings">
+            <el-checkbox v-for="c in colOptions" :key="c.key"
+                         :model-value="visibleCols.includes(c.key)"
+                         @change="(v) => toggleCol(c.key, v)">{{ c.label }}</el-checkbox>
+            <el-divider style="margin:6px 0" />
+            <el-button size="small" type="primary" plain style="width:100%" @click="onResetCols">恢复默认</el-button>
+          </div>
+        </el-popover>
         <div style="flex:1"></div>
         <el-dropdown @command="downloadLedger">
           <el-button type="success" :loading="exporting">
@@ -106,28 +118,30 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="机型" width="120" sortable :sort-by="(row) => row.project?.machine_model || ''">
+        <el-table-column v-if="visibleCols.includes('machine')" label="机型" width="120" sortable :sort-by="(row) => row.project?.machine_model || ''">
           <template #default="{ row }">{{ row.project.machine_model || '—' }}</template>
         </el-table-column>
-        <el-table-column label="项目名称" min-width="180" sortable :sort-by="(row) => row.project?.name || ''">
+        <el-table-column v-if="visibleCols.includes('name')" label="项目名称" min-width="180" sortable :sort-by="(row) => row.project?.name || ''">
           <template #default="{ row }">
             <span class="project-name" @click="goDetail(row.project)">{{ row.project.name }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="项目描述" min-width="200" sortable :sort-by="(row) => row.project?.description || ''" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.project.description || '—' }}</template>
+        <el-table-column v-if="visibleCols.includes('description')" label="项目描述" min-width="220" sortable :sort-by="(row) => row.project?.description || ''">
+          <template #default="{ row }">
+            <div class="desc-cell">{{ row.project.description || '—' }}</div>
+          </template>
         </el-table-column>
-        <el-table-column label="状态" width="104" sortable :sort-by="(row) => row.project?.status || ''">
+        <el-table-column v-if="visibleCols.includes('status')" label="状态" width="104" sortable :sort-by="(row) => row.project?.status || ''">
           <template #default="{ row }">
             <span class="status-chip" :class="'st-' + row.project.status">{{ statusMap[row.project.status] || row.project.status }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="项目角色" min-width="180">
+        <el-table-column v-if="visibleCols.includes('roles')" label="项目角色" min-width="180">
           <template #default="{ row }">
             <span class="role-summary">{{ row.project.project_roles || '未分配' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="当前节点" min-width="200">
+        <el-table-column v-if="visibleCols.includes('current_node')" label="当前节点" min-width="200">
           <template #default="{ row }">
             <div v-if="currentNodeList(row).length" class="cn-list">
               <div v-for="n in currentNodeList(row)" :key="n.id" class="cn-row" :class="{ current: n.is_current }">
@@ -139,7 +153,7 @@
             <span v-else class="pm-sub">未设置</span>
           </template>
         </el-table-column>
-        <el-table-column label="子节点" min-width="200">
+        <el-table-column v-if="visibleCols.includes('subnodes')" label="子节点" min-width="200">
           <template #default="{ row }">
             <div v-if="row.subnodes && row.subnodes.length" class="sub-inline-list">
               <div v-for="s in row.subnodes" :key="s.id" class="sub-inline" :class="{ done: s.status==='done' }"
@@ -154,7 +168,7 @@
             <span v-else class="pm-sub">无</span>
           </template>
         </el-table-column>
-        <el-table-column label="周目标" min-width="200">
+        <el-table-column v-if="visibleCols.includes('goals')" label="周目标" min-width="200">
           <template #default="{ row }">
             <div v-if="row.weekly_goal_items && row.weekly_goal_items.length" class="goal-items">
               <div v-for="g in row.weekly_goal_items" :key="g.id" class="goal-item" :class="{ done: g.done }"
@@ -170,7 +184,7 @@
             <div v-else class="goal-cell">{{ row.weekly_goal || '（未设周目标）' }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="每日进展" min-width="220">
+        <el-table-column v-if="visibleCols.includes('daily')" label="每日进展" min-width="220">
           <template #default="{ row }">
             <div v-if="dailyItems(row).length" class="daily-inline">
               <div v-for="(it, i) in dailyItems(row)" :key="i" class="daily-inline-item">
@@ -241,6 +255,26 @@ function onReset() {
   viewFilters.reset('weekly')
   load()
 }
+
+// 列显示/隐藏（按项目视图；展开列固定展示；配置持久化到 localStorage）
+const colOptions = [
+  { key: 'machine', label: '机型' },
+  { key: 'name', label: '项目名称' },
+  { key: 'description', label: '项目描述' },
+  { key: 'status', label: '状态' },
+  { key: 'roles', label: '项目角色' },
+  { key: 'current_node', label: '当前节点' },
+  { key: 'subnodes', label: '子节点' },
+  { key: 'goals', label: '周目标' },
+  { key: 'daily', label: '每日进展' },
+]
+const visibleCols = computed(() => viewFilters.columns.weekly)
+function toggleCol(key, on) {
+  const cur = new Set(viewFilters.columns.weekly)
+  if (on) cur.add(key); else cur.delete(key)
+  viewFilters.columns.weekly = [...cur]
+}
+function onResetCols() { viewFilters.resetColumns('weekly') }
 const loading = ref(false)
 const projectReports = ref([])
 const filterMachine = computed({ get: () => viewFilters.weekly.filterMachine, set: (v) => { viewFilters.weekly.filterMachine = v } })
@@ -429,6 +463,9 @@ onMounted(async () => {
 .table-card { padding: 6px 18px 16px; }
 .project-name { font-weight: 700; cursor: pointer; color: var(--pm-primary); }
 .project-name:hover { text-decoration: underline; }
+.desc-cell { white-space: pre-wrap; word-break: break-word; line-height: 1.5; color: var(--pm-text-2); font-size: 12.5px; }
+.col-settings { display: flex; flex-direction: column; gap: 6px; }
+.col-settings .el-checkbox { margin-right: 0; }
 .role-summary { white-space: pre-line; line-height: 1.45; font-size: 12px; }
 .node-deadline { margin-top: 3px; }
 .report-body { padding: 6px 4px; }
@@ -448,7 +485,9 @@ onMounted(async () => {
 .cn-overdue { color: var(--pm-danger); font-size: 12px; font-weight: 600; flex-shrink: 0; }
 .goal-cell { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; line-height: 1.5; }
 .goal-items { display: flex; flex-direction: column; gap: 3px; }
-.goal-item { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; min-height: 24px; }
+.goal-item { display: flex; align-items: flex-start; gap: 6px; padding: 2px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; min-height: 24px; }
+.goal-item .el-icon { margin-top: 2px; }
+.goal-item .gi-date, .goal-item .gi-owner { margin-top: 1px; }
 .goal-item:hover { background: var(--pm-primary-light); }
 .goal-item.done { background: var(--pm-st-completed-bg); }
 .goal-item.done .gi-goal { color: var(--pm-success); text-decoration: line-through; }
