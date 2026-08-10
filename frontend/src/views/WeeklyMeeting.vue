@@ -435,20 +435,31 @@ async function fetchAllProjects() {
   return all
 }
 
+// 加载序号守卫：重置/切周会并发触发 load，旧请求晚返回会覆盖新数据（显示错乱）。
+// 每次 load 自增序号，任一 await 返回后发现序号过期即放弃本次写入。
+let loadSeq = 0
+
 async function load() {
+  const seq = ++loadSeq
+  const ws = weekStart.value  // 稳定周次：reset 在循环中改 store 也不会污染本次请求
   loading.value = true
   try {
     if (view.value === 'project') {
       const projects = await fetchAllProjects()
+      if (seq !== loadSeq) return
       const reports = []
-      for (const p of projects) reports.push(await projectWeekly(p.id, weekStart.value))
+      for (const p of projects) {
+        reports.push(await projectWeekly(p.id, ws))
+        if (seq !== loadSeq) return  // 已有更新的 load，放弃本次
+      }
       projectReports.value = reports
       expandedProjects.value = []
     } else {
-      personReports.value = await groupWeekly('person', weekStart.value)
+      personReports.value = await groupWeekly('person', ws)
+      if (seq !== loadSeq) return
     }
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
