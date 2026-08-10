@@ -85,6 +85,17 @@ class Attachment(IdMixin, SoftDeleteMixin, Base):
 ATTACHMENT_CATEGORIES = ("需求矩阵", "方案设计", "验证报告", "其他")
 
 
+class ProjectRisk(IdMixin, TimestampMixin, Base):
+    """项目独立风险（项目详情「风险管理」单独添加；区别于进展内填报的 progress.risk）。"""
+    __tablename__ = "project_risk"
+
+    project_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("project.id", ondelete="RESTRICT"), nullable=False)
+    risk: Mapped[str] = mapped_column(String(500), nullable=False)
+    resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("user.id", ondelete="RESTRICT"))
+
+
 class AiSummary(IdMixin, TimestampMixin, Base):
     __tablename__ = "ai_summary"
 

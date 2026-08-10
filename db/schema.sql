@@ -309,6 +309,20 @@ CREATE INDEX ix_attachment_task    ON attachment(task_id)         WHERE NOT is_d
 CREATE INDEX ix_attachment_review  ON attachment(review_id)       WHERE NOT is_deleted;
 COMMENT ON TABLE attachment IS '附件（至少关联 node/task/review 之一）';
 
+-- 项目独立风险（项目详情「风险管理」单独添加；与进展内填报的 progress.risk 并存）
+CREATE TABLE project_risk (
+    id          BIGSERIAL PRIMARY KEY,
+    project_id  BIGINT NOT NULL REFERENCES project(id) ON DELETE RESTRICT,
+    risk        VARCHAR(500) NOT NULL,
+    resolved    BOOLEAN NOT NULL DEFAULT FALSE,
+    resolved_at TIMESTAMPTZ,
+    created_by  BIGINT REFERENCES "user"(id) ON DELETE RESTRICT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX ix_project_risk_project ON project_risk(project_id);
+COMMENT ON TABLE project_risk IS '项目独立风险（可添加/删除/关闭，区别于进展内填报的风险）';
+
 -- ---------------------------------------------------------------------
 -- 8. AI 绩效总结
 -- ---------------------------------------------------------------------

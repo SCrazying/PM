@@ -176,20 +176,36 @@
             <span class="card-title">风险管理
               <el-tag v-if="openRiskCount" size="small" type="warning" effect="plain" style="margin-left:6px">{{ openRiskCount }} 未解决</el-tag>
             </span>
+            <el-button v-if="canEdit" size="small" link type="primary" @click="openRiskAdd">+ 添加</el-button>
           </div>
           <div v-if="risks.length" class="risk-list">
-            <div v-for="r in risks" :key="r.progress_id" class="risk-item" :class="{ resolved: r.resolved }"
+            <div v-for="r in risks" :key="r.key" class="risk-item" :class="{ resolved: r.resolved }"
                  @click="onToggleRisk(r)" :title="r.resolved ? '点击重新打开风险' : '点击关闭风险'">
               <el-icon :size="14" class="risk-ico"><CircleCheckFilled v-if="r.resolved" /><WarningFilled v-else /></el-icon>
               <div class="risk-body">
                 <div class="risk-txt">{{ r.risk }}</div>
                 <div class="risk-meta">[{{ r.date }}] {{ r.author }}</div>
               </div>
-              <el-tag v-if="r.resolved" size="small" type="success" effect="plain">已解决</el-tag>
+              <span class="risk-ops" @click.stop>
+                <el-tag v-if="r.resolved" size="small" type="success" effect="plain">已解决</el-tag>
+                <el-button v-if="r.can_delete && canEdit" link size="small" type="danger" @click="onDeleteRisk(r)">删</el-button>
+              </span>
             </div>
           </div>
           <div v-else class="empty">暂无风险</div>
         </div>
+
+        <el-dialog v-model="riskVisible" title="添加风险" width="480px" :close-on-click-modal="false">
+          <el-form label-width="70px">
+            <el-form-item label="风险" required>
+              <el-input v-model="riskForm.risk" type="textarea" :rows="3" placeholder="描述当前风险/阻塞（可在进展中随时关闭）" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="riskVisible = false">取消</el-button>
+            <el-button type="primary" :loading="riskSaving" @click="saveRisk">保存</el-button>
+          </template>
+        </el-dialog>
 
         <div class="pm-card" style="margin-top:14px">
           <div class="card-title" style="margin-bottom:8px">进展时间线</div>
@@ -337,9 +353,9 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addMember, addReview, addSubnode, addWeeklyGoalItem, createTask, deleteSubnode, deleteTask,
-  deleteWeeklyGoalItem, getProject, listMembers, listProgress, listProjectRisks, listReviews, listTasks,
+  deleteWeeklyGoalItem, addProjectRisk, deleteProjectRisk, getProject, listMembers, listProgress, listProjectRisks, listReviews, listTasks,
   listUserOptions, nodeAdvance, nodeComplete, nodeCompletion, projectCompletion,
-  projectWeekly, removeMember, setProgressRiskResolved, setSubnodeStatus, setTaskStatus, setWeeklyGoalItemDone,
+  projectWeekly, removeMember, setProgressRiskResolved, setProjectRiskResolved, setSubnodeStatus, setTaskStatus, setWeeklyGoalItemDone,
   updateProgress, updateSubnode, updateTask, updateWeeklyGoalItem,
 } from '../api'
 import { useUserStore } from '../store/user'
@@ -362,6 +378,9 @@ const reviews = ref([])
 const progressList = ref([])
 const risks = ref([])
 const openRiskCount = computed(() => risks.value.filter((r) => !r.resolved).length)
+const riskVisible = ref(false)
+const riskSaving = ref(false)
+const riskForm = reactive({ risk: '' })
 const progressVisible = ref(false)
 const progressSaving = ref(false)
 const progressForm = reactive({ id: null, progress_date: '', node_name: '', today_work: '', tomorrow_plan: '', risk: '' })
@@ -446,11 +465,48 @@ async function loadProgress() { progressList.value = (await listProgress(pid, {}
 async function loadRisks() {
   risks.value = await listProjectRisks(pid).catch(() => [])
 }
+function openRiskAdd() {
+  riskForm.risk = ''
+  riskVisible.value = true
+}
+async function saveRisk() {
+  if (!riskForm.risk.trim()) { ElMessage.warning('请输入风险内容'); return }
+  riskSaving.value = true
+  try {
+    await addProjectRisk(pid, { risk: riskForm.risk })
+    ElMessage.success('已添加')
+    riskVisible.value = false
+    loadRisks()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '添加失败')
+  } finally {
+    riskSaving.value = false
+  }
+}
 async function onToggleRisk(r) {
   const target = !r.resolved
-  await setProgressRiskResolved(r.progress_id, target).catch(() => {})
-  r.resolved = target
-  ElMessage.success(target ? '已关闭风险' : '已重新打开风险')
+  try {
+    if (r.source === 'risk') await setProjectRiskResolved(r.id, target)
+    else await setProgressRiskResolved(r.id, target)
+    r.resolved = target
+    ElMessage.success(target ? '已关闭风险' : '已重新打开风险')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '操作失败')
+  }
+}
+async function onDeleteRisk(r) {
+  try {
+    await ElMessageBox.confirm(`确认删除风险「${r.risk.length > 20 ? r.risk.slice(0, 20) + '…' : r.risk}」？`, '删除确认', { type: 'warning', confirmButtonText: '删除' })
+  } catch {
+    return
+  }
+  try {
+    await deleteProjectRisk(r.id)
+    ElMessage.success('已删除')
+    loadRisks()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '删除失败')
+  }
 }
 async function loadProjComp() { projComp.value = await projectCompletion(pid).catch(() => ({ total: 0, passed: 0, percent: 0 })) }
 // 竞态守卫：快速切换本周/下周时，旧请求晚返回不覆盖新周数据
@@ -676,6 +732,7 @@ onMounted(loadAll)
 .risk-txt { font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
 .risk-item.resolved .risk-txt { color: var(--pm-text-3); text-decoration: line-through; }
 .risk-meta { color: var(--pm-text-3); font-size: 11.5px; margin-top: 2px; }
+.risk-ops { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .member-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--pm-border); }
 .member-item:last-child { border-bottom: none; }
 .avatar-sm { width: 26px; height: 26px; border-radius: 50%; background: var(--pm-gradient); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }

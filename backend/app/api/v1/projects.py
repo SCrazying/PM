@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.core.responses import ok, page_result
-from app.models.misc import Progress
-from app.models.project import ProjectNode
+from app.core.responses import BizException, ForbiddenError, NotFoundError, ok, page_result
+from app.models.misc import Progress, ProjectRisk
+from app.models.project import Project, ProjectMember, ProjectNode
 from app.models.user import User
 from app.schemas.project import MemberIn, ProjectCreate, ProjectOut, ProjectUpdate
 from app.services.audit_service import record_audit
@@ -18,20 +18,91 @@ from app.services.project_service import ProjectService
 router = APIRouter()
 
 
+def _check_risk_perm(db: Session, project_id: int, user: dict) -> Project:
+    """校验项目存在 + 成员/负责人/admin 可操作风险管理。"""
+    project = db.get(Project, project_id)
+    if not project or project.is_deleted:
+        raise NotFoundError("项目不存在")
+    if user["role"] == "admin" or project.owner_id == user["user_id"]:
+        return project
+    is_member = db.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id, ProjectMember.user_id == user["user_id"],
+            ProjectMember.is_deleted.is_(False))
+    ).scalar_one_or_none()
+    if not is_member:
+        raise ForbiddenError("仅项目成员/负责人可管理风险")
+    return project
+
+
 @router.get("/{project_id}/risks")
 def list_project_risks(project_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """项目风险管理：汇总各进展填报的风险（含已关闭），供详情页单独管理。"""
-    rows = db.execute(
+    """项目风险管理：合并独立风险(project_risk) + 进展填报风险(progress.risk)。"""
+    name_map = {u.id: u.display_name for u in db.execute(select(User)).scalars().all()}
+    merged = []
+    for pr in db.execute(
+        select(ProjectRisk).where(ProjectRisk.project_id == project_id).order_by(ProjectRisk.id)
+    ).scalars().all():
+        merged.append({
+            "key": f"risk:{pr.id}", "id": pr.id, "source": "risk", "risk": pr.risk,
+            "resolved": pr.resolved, "date": (pr.created_at.date().isoformat() if pr.created_at else None),
+            "author": name_map.get(pr.created_by), "can_delete": True,
+        })
+    for p, uname in db.execute(
         select(Progress, User.display_name).join(User, User.id == Progress.author_id).where(
             Progress.project_id == project_id,
             Progress.is_deleted.is_(False),
             Progress.risk.isnot(None), Progress.risk != "",
         ).order_by(Progress.progress_date.desc(), Progress.id.desc())
-    ).all()
-    return ok([{
-        "progress_id": p.id, "date": p.progress_date, "author": uname,
-        "risk": p.risk, "resolved": p.risk_resolved,
-    } for p, uname in rows])
+    ).all():
+        merged.append({
+            "key": f"progress:{p.id}", "id": p.id, "source": "progress", "risk": p.risk,
+            "resolved": p.risk_resolved, "date": p.progress_date.isoformat(),
+            "author": uname, "can_delete": False,
+        })
+    return ok(merged)
+
+
+@router.post("/{project_id}/risks")
+def add_project_risk(project_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """项目详情单独添加风险。"""
+    _check_risk_perm(db, project_id, user)
+    risk = (body.get("risk") or "").strip()
+    if not risk:
+        raise BizException("风险内容不能为空")
+    pr = ProjectRisk(project_id=project_id, risk=risk, created_by=user["user_id"])
+    db.add(pr)
+    db.commit()
+    db.refresh(pr)
+    record_audit(db, user["user_id"], "create", "project_risk", str(pr.id), {"project_id": project_id})
+    return ok({"id": pr.id}, message="已添加")
+
+
+@router.patch("/risks/{rid}")
+def set_project_risk_resolved(rid: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """关闭/重新打开独立风险。"""
+    pr = db.get(ProjectRisk, rid)
+    if not pr:
+        raise NotFoundError("风险不存在")
+    _check_risk_perm(db, pr.project_id, user)
+    from datetime import datetime, timezone
+    pr.resolved = bool(body.get("resolved"))
+    pr.resolved_at = datetime.now(timezone.utc) if pr.resolved else None
+    db.commit()
+    return ok({"id": pr.id, "resolved": pr.resolved}, message="已更新")
+
+
+@router.delete("/risks/{rid}")
+def delete_project_risk(rid: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """删除独立风险。"""
+    pr = db.get(ProjectRisk, rid)
+    if not pr:
+        raise NotFoundError("风险不存在")
+    _check_risk_perm(db, pr.project_id, user)
+    db.delete(pr)
+    db.commit()
+    record_audit(db, user["user_id"], "delete", "project_risk", str(rid))
+    return ok(message="已删除")
 
 
 @router.get("")
