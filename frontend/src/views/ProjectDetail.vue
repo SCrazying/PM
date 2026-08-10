@@ -152,6 +152,7 @@
               </span>
             </div>
           </div>
+          <div v-else-if="legacyGoal" class="goal-cell">{{ legacyGoal }}</div>
           <div v-else class="empty">未设定{{ goalWeek === 'next' ? '下周' : '本周' }}目标</div>
         </div>
 
@@ -317,8 +318,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addMember, addReview, addSubnode, addWeeklyGoalItem, createTask, deleteSubnode, deleteTask,
   deleteWeeklyGoalItem, getProject, listMembers, listProgress, listReviews, listTasks,
-  listUserOptions, listWeeklyGoalItems, nodeAdvance, nodeComplete, nodeCompletion, projectCompletion,
-  removeMember, setSubnodeStatus, setTaskStatus, setWeeklyGoalItemDone,
+  listUserOptions, nodeAdvance, nodeComplete, nodeCompletion, projectCompletion,
+  projectWeekly, removeMember, setSubnodeStatus, setTaskStatus, setWeeklyGoalItemDone,
   updateProgress, updateSubnode, updateTask, updateWeeklyGoalItem,
 } from '../api'
 import { useUserStore } from '../store/user'
@@ -421,11 +422,16 @@ async function loadProgress() { progressList.value = (await listProgress(pid, {}
 async function loadProjComp() { projComp.value = await projectCompletion(pid).catch(() => ({ total: 0, passed: 0, percent: 0 })) }
 // 竞态守卫：快速切换本周/下周时，旧请求晚返回不覆盖新周数据
 let goalLoadSeq = 0
+const legacyGoal = ref('')  // 旧周目标文本（条目为空时回落显示，与周会视图一致）
 async function loadGoal() {
   const seq = ++goalLoadSeq
   const ws = goalWeekStart.value
-  const data = await listWeeklyGoalItems(pid, ws).catch(() => [])
-  if (seq === goalLoadSeq) goalItems.value = data
+  // 与周会视图同一接口取周目标，保证两处显示一致
+  const data = await projectWeekly(pid, ws).catch(() => null)
+  if (seq === goalLoadSeq) {
+    goalItems.value = data?.weekly_goal_items || []
+    legacyGoal.value = data?.weekly_goal || ''
+  }
 }
 
 // ---------- M7 周目标条目 ----------
@@ -614,6 +620,7 @@ onMounted(loadAll)
 .review-item { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 6px; }
 .goal-text { font-size: 14px; line-height: 1.6; }
 .goal-items { display: flex; flex-direction: column; gap: 3px; }
+.goal-cell { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; line-height: 1.5; color: var(--pm-text-2); font-size: 13px; }
 .goal-item { display: flex; align-items: flex-start; gap: 6px; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1.5; }
 .goal-item:hover { background: var(--pm-primary-light); }
 .goal-item.done { background: var(--pm-st-completed-bg); }
