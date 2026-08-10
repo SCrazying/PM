@@ -5,7 +5,7 @@
         <div class="tb-left">
           <span class="pm-page-title">周会视图</span>
           <el-date-picker v-model="weekStart" type="week" format="YYYY 第 ww 周" value-format="YYYY-MM-DD"
-                          style="width: 180px" @change="load" />
+                          :first-day-of-week="1" style="width: 180px" @change="load" />
           <el-select v-model="filterMachine" clearable filterable placeholder="按机型筛选" style="width: 150px">
             <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
           </el-select>
