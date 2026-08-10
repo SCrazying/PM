@@ -10,17 +10,17 @@ $Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $Nssm = Join-Path $Root "deploy\bin\nssm.exe"
 
 Write-Host "==> 停止并删除服务 $ServiceName ..." -ForegroundColor Yellow
-& $Nssm stop $ServiceName 2>$null | Out-Null
+cmd /c "`"$Nssm`" stop $ServiceName 2>nul"
 Start-Sleep -Seconds 2
-& $Nssm remove $ServiceName confirm
+cmd /c "`"$Nssm`" remove $ServiceName confirm 2>nul"
 
 # 同时清理 MinIO 对象存储服务（若存在）
 $MinioService = "$ServiceName-minio"
 if ($null -ne (Get-Service -Name $MinioService -ErrorAction SilentlyContinue)) {
     Write-Host "==> 停止并删除服务 $MinioService ..." -ForegroundColor Yellow
-    & $Nssm stop $MinioService 2>$null | Out-Null
+    cmd /c "`"$Nssm`" stop $MinioService 2>nul"
     Start-Sleep -Seconds 2
-    & $Nssm remove $MinioService confirm 2>$null | Out-Null
+    cmd /c "`"$Nssm`" remove $MinioService confirm 2>nul"
 }
 
 if (-not $KeepData) {

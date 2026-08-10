@@ -29,6 +29,20 @@ $BackendDir = Join-Path $Root "backend"
 $Nssm = Join-Path $Root "deploy\bin\nssm.exe"
 $InitDb = Join-Path $PSScriptRoot "init_db.ps1"
 
+# 包装 nssm 调用：$ErrorActionPreference=Stop 会把 nssm 的 stderr（STOP:/START: 状态行）当 NativeCommandError 中断脚本。
+# 这里临时切 Continue + 丢弃 stderr，失败与否通过 $LASTEXITCODE 判断。
+function Invoke-Nssm {
+    param([Parameter(ValueFromRemainingArguments = $true)][object[]]$NssmArgs)
+    $oldEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $Nssm @NssmArgs 2>$null
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldEap
+    }
+}
+
 if (-not (Test-Path $Python) -or -not (Test-Path $Nssm)) {
     Write-Host ""
     Write-Host "[错误] 部署包结构不完整：" -ForegroundColor Red
@@ -88,13 +102,14 @@ $lines += "CORS_ORIGINS="
 $lines += "UPLOAD_DIR=$Root\data\uploads"
 $lines += "BACKUP_DIR=$Root\data\backups"
 # MinIO 对象存储（项目资料）：minio.exe 存在且未 -NoMinio 时启用
+# 凭据统一用 MinIO 默认 minioadmin/minioadmin（与既有数据目录匹配；该目录凭据首次初始化即固化）
 $MinioExe = Join-Path $Root "runtime\minio\minio.exe"
 $useMinio = (-not $NoMinio) -and (Test-Path $MinioExe)
 if ($useMinio) {
     $lines += "STORAGE_BACKEND=minio"
     $lines += "MINIO_ENDPOINT=127.0.0.1:$MinioPort"
-    $lines += "MINIO_ACCESS_KEY=pm"
-    $lines += "MINIO_SECRET_KEY=pmsecret123"
+    $lines += "MINIO_ACCESS_KEY=minioadmin"
+    $lines += "MINIO_SECRET_KEY=minioadmin"
     $lines += "MINIO_BUCKET=pm-system"
     $lines += "MINIO_SECURE=false"
 } else {
@@ -128,29 +143,30 @@ Write-Host "[服务] 注册 Windows 服务 $ServiceName ..." -ForegroundColor Ye
 # 幂等：若已存在同名服务，先停止并移除（服务不存在时静默跳过，避免 nssm stop 报错）
 $svcExists = $null -ne (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)
 if ($svcExists) {
-    & $Nssm stop $ServiceName 2>$null | Out-Null
+    # cmd /c 静默：Stop 模式下 PowerShell 会把 nssm 的 stderr 当 NativeCommandError，用 cmd 层丢弃
+    cmd /c "`"$Nssm`" stop $ServiceName 2>nul"
     Start-Sleep -Seconds 1
-    & $Nssm remove $ServiceName confirm 2>$null | Out-Null
+    cmd /c "`"$Nssm`" remove $ServiceName confirm 2>nul"
     Start-Sleep -Seconds 1
 }
 
 # 安装服务（python 路径加引号防空格；NSSM 装服务需管理员权限）
-& $Nssm install $ServiceName "`"$Python`""
+Invoke-Nssm install $ServiceName "`"$Python`""
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[错误] NSSM 安装服务失败。请以【管理员身份】运行 PowerShell 后重试本脚本。" -ForegroundColor Red
     throw "NSSM 安装服务失败（可能需要管理员权限）"
 }
-& $Nssm set $ServiceName AppDirectory $BackendDir
-& $Nssm set $ServiceName AppParameters "-m uvicorn app.main:app --host 0.0.0.0 --port $Port"
-& $Nssm set $ServiceName DisplayName "PM-System 项目管理系统"
-& $Nssm set $ServiceName Description "内网项目管理系统（FastAPI 后端 + 前端静态伺服）"
-& $Nssm set $ServiceName Start SERVICE_AUTO_START
-& $Nssm set $ServiceName AppStdout "$Root\data\logs\backend.log"
-& $Nssm set $ServiceName AppStderr "$Root\data\logs\backend.err"
-& $Nssm set $ServiceName AppRotateFiles 1
-& $Nssm set $ServiceName AppRotateBytes 10485760
-& $Nssm set $ServiceName AppExit Default Restart
-& $Nssm set $ServiceName AppRestartDelay 5000
+Invoke-Nssm set $ServiceName AppDirectory $BackendDir
+Invoke-Nssm set $ServiceName AppParameters "-m uvicorn app.main:app --host 0.0.0.0 --port $Port"
+Invoke-Nssm set $ServiceName DisplayName "PM-System 项目管理系统"
+Invoke-Nssm set $ServiceName Description "内网项目管理系统（FastAPI 后端 + 前端静态伺服）"
+Invoke-Nssm set $ServiceName Start SERVICE_AUTO_START
+Invoke-Nssm set $ServiceName AppStdout "$Root\data\logs\backend.log"
+Invoke-Nssm set $ServiceName AppStderr "$Root\data\logs\backend.err"
+Invoke-Nssm set $ServiceName AppRotateFiles 1
+Invoke-Nssm set $ServiceName AppRotateBytes 10485760
+Invoke-Nssm set $ServiceName AppExit Default Restart
+Invoke-Nssm set $ServiceName AppRestartDelay 5000
 
 # ---------- 3.6 MinIO 对象存储服务（项目资料） ----------
 $MinioService = "$ServiceName-minio"
@@ -159,28 +175,30 @@ if ($useMinio) {
     New-Item -ItemType Directory -Force -Path "$Root\data\minio" | Out-Null
     $mSvc = $null -ne (Get-Service -Name $MinioService -ErrorAction SilentlyContinue)
     if ($mSvc) {
-        & $Nssm stop $MinioService 2>$null | Out-Null
+        cmd /c "`"$Nssm`" stop $MinioService 2>nul"
         Start-Sleep -Seconds 1
-        & $Nssm remove $MinioService confirm 2>$null | Out-Null
+        cmd /c "`"$Nssm`" remove $MinioService confirm 2>nul"
         Start-Sleep -Seconds 1
     }
-    & $Nssm install $MinioService "`"$MinioExe`""
-    & $Nssm set $MinioService AppDirectory $Root
-    & $Nssm set $MinioService AppParameters "server `"$Root\data\minio`" --address :$MinioPort --console-address :$MinioConsolePort"
-    & $Nssm set $MinioService DisplayName "PM-System MinIO 对象存储"
-    & $Nssm set $MinioService Description "PM-System 项目资料对象存储（S3 兼容）"
-    & $Nssm set $MinioService Start SERVICE_AUTO_START
-    & $Nssm set $MinioService AppStdout "$Root\data\logs\minio.log"
-    & $Nssm set $MinioService AppStderr "$Root\data\logs\minio.err"
-    & $Nssm set $MinioService AppRotateFiles 1
-    & $Nssm set $MinioService AppRestartDelay 5000
-    # MinIO 根账号（与 .env 一致）
-    & $Nssm set $MinioService AppEnvironmentExtra "MINIO_ROOT_USER=pm" "MINIO_ROOT_PASSWORD=pmsecret123" | Out-Null
-    & $Nssm start $MinioService | Out-Null
-    Start-Sleep -Seconds 3
+    # minio.exe 直连 + 清空 NSSM 环境变量（凭据用 MinIO 默认 minioadmin/minioadmin，与 data\minio 初始化一致）
+    # 不能用 AppEnvironmentExtra 传 MINIO_ROOT_USER=pm——NSSM 在本环境会把 pm 传进 minio 导致其崩溃
+    Invoke-Nssm install $MinioService "`"$MinioExe`""
+    Invoke-Nssm set $MinioService AppDirectory $Root
+    Invoke-Nssm set $MinioService AppParameters "server `"$Root\data\minio`" --address :$MinioPort --console-address :$MinioConsolePort"
+    Invoke-Nssm set $MinioService AppEnvironmentExtra "" 2>&1 | Out-Null
+    Invoke-Nssm set $MinioService DisplayName "PM-System MinIO 对象存储"
+    Invoke-Nssm set $MinioService Description "PM-System 项目资料对象存储（S3 兼容）"
+    Invoke-Nssm set $MinioService Start SERVICE_AUTO_START
+    Invoke-Nssm set $MinioService AppStdout "$Root\data\logs\minio.log"
+    Invoke-Nssm set $MinioService AppStderr "$Root\data\logs\minio.err"
+    Invoke-Nssm set $MinioService AppRotateFiles 1
+    Invoke-Nssm set $MinioService AppRestartDelay 2000
+    Invoke-Nssm set $MinioService AppExit Default Restart
+    Invoke-Nssm start $MinioService | Out-Null
+    Start-Sleep -Seconds 4
     $minioOk = try { (Invoke-WebRequest -Uri "http://127.0.0.1:$MinioPort/minio/health/live" -UseBasicParsing -TimeoutSec 6).StatusCode } catch { 0 }
     if ($minioOk -eq 200) {
-        Write-Host "[MinIO] 已启动（S3: http://127.0.0.1:$MinioPort  控制台: http://127.0.0.1:$MinioConsolePort  账号 pm/pmsecret123）" -ForegroundColor Green
+        Write-Host "[MinIO] 已启动（S3: http://127.0.0.1:$MinioPort  控制台: http://127.0.0.1:$MinioConsolePort  账号 minioadmin/minioadmin）" -ForegroundColor Green
     } else {
         Write-Host "[MinIO] 服务已注册但健康检查未通过（HTTP $minioOk），资料存储将回退本地磁盘；可看 data\logs\minio.err" -ForegroundColor Yellow
     }
@@ -190,11 +208,11 @@ if ($useMinio) {
 
 # ---------- 3.5 防火墙放行端口（内网同事可访问） ----------
 Write-Host "[防火墙] 放行 TCP $Port ..." -ForegroundColor Yellow
-netsh advfirewall firewall add rule name="PM-System-$Port" dir=in action=allow protocol=TCP localport=$Port 2>$null | Out-Null
+cmd /c "netsh advfirewall firewall add rule name=PM-System-$Port dir=in action=allow protocol=TCP localport=$Port 2>nul" | Out-Null
 
 # ---------- 4. 启动服务 ----------
 Write-Host "[服务] 启动 $ServiceName ..." -ForegroundColor Yellow
-& $Nssm start $ServiceName
+Invoke-Nssm start $ServiceName
 Start-Sleep -Seconds 6
 $health = try { (Invoke-WebRequest -Uri "http://127.0.0.1:$Port/health" -UseBasicParsing -TimeoutSec 8).StatusCode } catch { 0 }
 

@@ -285,22 +285,28 @@ class ProjectService:
         return project
 
     def apply_node_enabled(self, project: Project, enabled_ids: list[int]) -> None:
-        """编辑项目时启用/停用节点：未列出的顶层节点停用，列出的启用/恢复；子节点跟随父节点。"""
+        """编辑项目时启用/停用节点：未列出的顶层节点停用，列出的启用/恢复；子节点跟随父节点。
+
+        两遍循环：先定顶层节点状态，再统一处理子节点——避免单遍循环依赖 DB 返回顺序
+        （子节点先于父节点遍历时读到旧 is_deleted，导致"恢复父节点时子节点被误停用"）。"""
         from datetime import datetime, timezone
         enabled_set = set(enabled_ids)
         nodes = list(self.db.execute(
             select(ProjectNode).where(ProjectNode.project_id == project.id)
         ).scalars().all())
         now = datetime.now(timezone.utc)
-        top = {n.id: n for n in nodes if n.parent_id is None}
+        # 第一遍：顶层节点状态（不依赖遍历顺序）
+        top_active: dict[int, bool] = {}
         for node in nodes:
             if node.parent_id is None:
                 active = node.id in enabled_set
                 node.is_deleted = not active
                 node.deleted_at = None if active else now
-            else:
-                parent = top.get(node.parent_id)
-                parent_active = parent is not None and not parent.is_deleted
+                top_active[node.id] = active
+        # 第二遍：子节点跟随父节点最终状态
+        for node in nodes:
+            if node.parent_id is not None:
+                parent_active = top_active.get(node.parent_id, False)
                 node.is_deleted = not parent_active
                 node.deleted_at = None if parent_active else now
         self._refresh_current_node(project)
