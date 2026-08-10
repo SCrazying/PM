@@ -126,8 +126,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createProgress, listNodes, listTasks, myTodo, updateProgress } from '../api'
+import { todayStr } from '../utils/date'
 
-const today = new Date().toISOString().slice(0, 10)
+const today = todayStr()
 const todo = reactive({ projects: [], tasks: [], recent_progress: [] })
 const fillProject = ref(null)
 const nodes = ref([])

@@ -114,6 +114,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createProject, listMachineOptions, listTemplates, listUserOptions, updateProject } from '../api'
+import { todayStr } from '../utils/date'
 
 const emit = defineEmits(['saved'])
 
@@ -208,11 +209,11 @@ function onNodeChange() {
 }
 
 function isNodePlanOverdue(plan) {
-  return Boolean(plan?.planned_end && plan.planned_end < new Date().toISOString().slice(0, 10))
+  return Boolean(plan?.planned_end && plan.planned_end < todayStr())
 }
 
 function isDeadlineOverdue(deadline) {
-  return Boolean(deadline && deadline < new Date().toISOString().slice(0, 10))
+  return Boolean(deadline && deadline < todayStr())
 }
 
 function nodePlanPayload() {

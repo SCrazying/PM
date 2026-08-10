@@ -1,5 +1,6 @@
 import { reactive, watch } from 'vue'
 import { defineStore } from 'pinia'
+import { thisWeekStart } from '../utils/date'
 
 // 下拉筛选持久化：跨视图切换 + 刷新页面均保留；提供 reset(key) 重置回默认值
 // columns：各列表/视图的列显示配置（独立于筛选，reset 不清空，恢复默认用 resetColumns）
@@ -8,7 +9,8 @@ const STORAGE_KEY = 'pm-view-filters'
 const DEFAULTS = () => ({
   board: { machine_model: '' },
   projectList: { keyword: '', status: '', machine_model: '', page: 1, size: 10, sort_field: 'id', sort_order: 'desc' },
-  weekly: { weekStart: new Date().toISOString().slice(0, 10), filterMachine: '', view: 'project', filterPerson: '', filterRole: '', filterStatus: 'in_progress', dailyTodayOnly: false },
+  // weekStart 默认=本周周一（本地日期）；不能用 toISOString（UTC 边界凌晨会取到昨天、周日时错周）
+  weekly: { weekStart: thisWeekStart(), filterMachine: '', view: 'project', filterPerson: '', filterRole: '', filterStatus: 'in_progress', dailyTodayOnly: false },
 })
 
 // 各视图默认可见列（操作列/展开列固定展示，不进列表）

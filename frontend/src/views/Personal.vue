@@ -109,11 +109,12 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { editAiSummary, genAiSummary, getAiSummary, personalSummary } from '../api'
 import { useUserStore } from '../store/user'
+import { todayStr } from '../utils/date'
 
 const store = useUserStore()
 const uid = computed(() => store.userInfo?.id)
 const period = ref('month')
-const refDate = ref(new Date().toISOString().slice(0, 10))
+const refDate = ref(todayStr())
 const summary = ref({ projects: [], total_progress: 0 })
 const aiSummary = ref(null)
 const editContent = ref('')

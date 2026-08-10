@@ -127,7 +127,11 @@
       <el-col :span="9">
         <div class="pm-card">
           <div class="pm-flex-between" style="margin-bottom:8px">
-            <span class="card-title">本周目标
+            <span class="card-title">周目标
+              <el-radio-group v-model="goalWeek" size="small" style="margin-left:8px; vertical-align: middle" @change="loadGoal">
+                <el-radio-button value="this">本周</el-radio-button>
+                <el-radio-button value="next">下周</el-radio-button>
+              </el-radio-group>
               <el-tag v-if="goalItems.length && goalItems.filter(g=>g.done).length===goalItems.length" size="small" type="success" style="margin-left:6px">全部完成</el-tag>
             </span>
             <el-button size="small" link type="primary" @click="openGoalItem()" v-if="canEdit">+ 添加</el-button>
@@ -147,7 +151,7 @@
               </span>
             </div>
           </div>
-          <div v-else class="empty">未设定本周目标</div>
+          <div v-else class="empty">未设定{{ goalWeek === 'next' ? '下周' : '本周' }}目标</div>
         </div>
 
         <div class="pm-card" style="margin-top:14px">
@@ -242,6 +246,13 @@
         <el-form-item label="目标" required>
           <el-input v-model="goalForm.goal" type="textarea" :rows="2" placeholder="本周目标条目" />
         </el-form-item>
+        <el-form-item label="归属周次">
+          <el-radio-group v-model="goalForm.week" :disabled="!!goalForm.id">
+            <el-radio-button value="this">本周</el-radio-button>
+            <el-radio-button value="next">下周</el-radio-button>
+          </el-radio-group>
+          <span v-if="goalForm.id" class="pm-sub" style="margin-left:8px">编辑不改变目标所在周</span>
+        </el-form-item>
         <el-form-item label="负责人">
           <el-select v-model="goalForm.user_id" clearable filterable placeholder="选择项目成员（可不选）" style="width:100%">
             <el-option v-for="m in members" :key="m.user_id" :label="m.display_name" :value="m.user_id" />
@@ -312,6 +323,7 @@ import {
 import { useUserStore } from '../store/user'
 import ProjectForm from '../components/ProjectForm.vue'
 import ProjectFiles from '../components/ProjectFiles.vue'
+import { nextWeekStart, thisWeekStart } from '../utils/date'
 
 const route = useRoute()
 const store = useUserStore()
@@ -345,7 +357,10 @@ const memberForm = reactive({ user_id: null, project_role: '', is_invested: true
 const reviewVisible = ref(false)
 const reviewForm = reactive({ conclusion: 'pass', comment: '' })
 const goalVisible = ref(false)
-const goalForm = reactive({ id: null, goal: '', deadline: null, user_id: null })
+const goalForm = reactive({ id: null, goal: '', deadline: null, user_id: null, week: 'this' })
+// 周目标归属周切换（本周/下周）：本周有目标即可提前写下周目标（周五更新下周）
+const goalWeek = ref('this')
+const goalWeekStart = computed(() => (goalWeek.value === 'next' ? nextWeekStart() : thisWeekStart()))
 const editFormRef = ref()
 
 const ownerName = computed(() => userName(project.value?.owner_id))
@@ -398,13 +413,13 @@ async function loadTasks() {
 async function loadProgress() { progressList.value = (await listProgress(pid, {})).slice(0, 20) }
 async function loadProjComp() { projComp.value = await projectCompletion(pid).catch(() => ({ total: 0, passed: 0, percent: 0 })) }
 async function loadGoal() {
-  goalItems.value = await listWeeklyGoalItems(pid, new Date().toISOString().slice(0, 10)).catch(() => [])
+  goalItems.value = await listWeeklyGoalItems(pid, goalWeekStart.value).catch(() => [])
 }
 
 // ---------- M7 周目标条目 ----------
 function openGoalItem(g) {
-  if (g) Object.assign(goalForm, { id: g.id, goal: g.goal, deadline: g.deadline, user_id: g.user_id ?? null })
-  else Object.assign(goalForm, { id: null, goal: '', deadline: null, user_id: null })
+  if (g) Object.assign(goalForm, { id: g.id, goal: g.goal, deadline: g.deadline, user_id: g.user_id ?? null, week: goalWeek.value })
+  else Object.assign(goalForm, { id: null, goal: '', deadline: null, user_id: null, week: goalWeek.value })
   goalVisible.value = true
 }
 
@@ -412,7 +427,10 @@ async function saveGoal() {
   if (!goalForm.goal.trim()) { ElMessage.warning('请输入目标内容'); return }
   const payload = { goal: goalForm.goal, deadline: goalForm.deadline, user_id: goalForm.user_id || null }
   if (goalForm.id) await updateWeeklyGoalItem(goalForm.id, payload)
-  else await addWeeklyGoalItem(pid, { week_start: new Date().toISOString().slice(0, 10), ...payload })
+  else {
+    const ws = goalForm.week === 'next' ? nextWeekStart() : thisWeekStart()
+    await addWeeklyGoalItem(pid, { week_start: ws, ...payload })
+  }
   ElMessage.success('已保存')
   goalVisible.value = false
   loadGoal()
