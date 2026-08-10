@@ -18,6 +18,8 @@
       <el-tab-pane label="数据备份" name="backup"><BackupAdmin /></el-tab-pane>
       <!-- 回收站 -->
       <el-tab-pane label="回收站" name="recycle"><RecycleBinAdmin /></el-tab-pane>
+      <!-- 操作日志 -->
+      <el-tab-pane label="操作日志" name="audit"><AuditLogAdmin /></el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -32,6 +34,7 @@ import BackupAdmin from '../components/admin/BackupAdmin.vue'
 import ImportAdmin from '../components/admin/ImportAdmin.vue'
 import RecycleBinAdmin from '../components/admin/RecycleBinAdmin.vue'
 import BoardReminderAdmin from '../components/admin/BoardReminderAdmin.vue'
+import AuditLogAdmin from '../components/admin/AuditLogAdmin.vue'
 
 const tab = ref('users')
 </script>

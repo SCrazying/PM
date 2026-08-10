@@ -5,11 +5,11 @@ import os
 import shutil
 import subprocess
 import sys
-from datetime import date
+from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -18,7 +18,7 @@ from app.core.deps import get_current_user, require_admin, require_self_or_admin
 from app.core.responses import BizException, ForbiddenError, NotFoundError, ok, page_result
 from app.core.storage import get_storage
 from app.engines.ai_engine import AiService
-from app.models.misc import Attachment, Config
+from app.models.misc import Attachment, AuditLog, Config
 from app.models.project import Project, ProjectMember, TrTemplate, TrTemplateNode
 from app.models.user import User
 from app.schemas.project import RecycleBatchIn
@@ -261,6 +261,7 @@ def create_template(body: dict, user: dict = Depends(require_admin), db: Session
             if sn_name.strip():
                 db.add(TrTemplateSubnode(template_node_id=node.id, name=str(sn_name).strip(), sequence=j))
     db.commit()
+    record_audit(db, user["user_id"], "create", "tr_template", str(tpl.id), {"name": tpl.name})
     return ok({"id": tpl.id}, message="模板已创建")
 
 
@@ -276,6 +277,7 @@ def update_template(tid: int, body: dict, user: dict = Depends(require_admin), d
     if body.get("description") is not None:
         tpl.description = body["description"]
     db.commit()
+    record_audit(db, user["user_id"], "update", "tr_template", str(tid), {"status": tpl.status})
     return ok(message="已更新")
 
 
@@ -385,6 +387,44 @@ def list_backups(user: dict = Depends(require_admin)):
         return ok([])
     files = sorted([f for f in os.listdir(settings.BACKUP_DIR) if f.startswith("db_")], reverse=True)
     return ok([{"file": f, "size": os.path.getsize(os.path.join(settings.BACKUP_DIR, f))} for f in files])
+
+
+# ---------- 审计日志（操作记录，V1.0.3）----------
+@router.get("/admin/audit-logs")
+def list_audit_logs(actor: str | None = None, action: str | None = None, target_type: str | None = None,
+                    target_id: str | None = None, date_from: date | None = None, date_to: date | None = None,
+                    page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=100),
+                    user: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    """操作日志查询：按操作者/动作/目标类型/目标id/时间过滤，分页（含操作者姓名）。"""
+    q = select(AuditLog, User.display_name).join(User, User.id == AuditLog.actor_id, isouter=True)
+    if actor:
+        q = q.where(or_(User.display_name.ilike(f"%{actor}%"), User.username.ilike(f"%{actor}%")))
+    if action:
+        q = q.where(AuditLog.action == action)
+    if target_type:
+        q = q.where(AuditLog.target_type == target_type)
+    if target_id:
+        q = q.where(AuditLog.target_id == target_id)
+    if date_from:
+        q = q.where(AuditLog.created_at >= datetime.combine(date_from, time.min))
+    if date_to:
+        q = q.where(AuditLog.created_at < datetime.combine(date_to + timedelta(days=1), time.min))
+    total = db.execute(select(func.count()).select_from(q.subquery())).scalar_one()
+    rows = db.execute(q.order_by(AuditLog.id.desc()).offset((page - 1) * size).limit(size)).all()
+    items = [{
+        "id": log.id, "time": log.created_at.isoformat() if log.created_at else None,
+        "actor_id": log.actor_id, "actor_name": uname, "action": log.action,
+        "target_type": log.target_type, "target_id": log.target_id, "detail": log.detail, "ip": log.ip,
+    } for log, uname in rows]
+    return page_result(items, total, page, size)
+
+
+@router.get("/admin/audit-meta")
+def audit_meta(user: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    """操作日志的可用 action / target_type 去重列表（供前端筛选下拉）。"""
+    actions = [r[0] for r in db.execute(select(AuditLog.action).distinct()).all()]
+    target_types = [r[0] for r in db.execute(select(AuditLog.target_type).distinct()).all()]
+    return ok({"actions": actions, "target_types": [t for t in target_types if t]})
 
 
 # ---------- 回收站（假删除项目：恢复 / 彻底删除）----------

@@ -89,6 +89,8 @@ def set_project_risk_resolved(rid: int, body: dict, user: dict = Depends(get_cur
     pr.resolved = bool(body.get("resolved"))
     pr.resolved_at = datetime.now(timezone.utc) if pr.resolved else None
     db.commit()
+    record_audit(db, user["user_id"], "update", "project_risk", str(rid),
+                 {"resolved": bool(body.get("resolved")), "risk": pr.risk})
     return ok({"id": pr.id, "resolved": pr.resolved}, message="已更新")
 
 
@@ -200,10 +202,13 @@ def list_members(project_id: int, user: dict = Depends(get_current_user), db: Se
 @router.post("/{project_id}/members")
 def add_member(project_id: int, body: MemberIn, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     ProjectService(db).add_member(project_id, body, user)
+    record_audit(db, user["user_id"], "create", "member", str(project_id),
+                 {"user_id": body.user_id, "role": body.project_role, "is_invested": body.is_invested})
     return ok(message="已添加")
 
 
 @router.delete("/{project_id}/members/{member_id}")
 def remove_member(project_id: int, member_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     ProjectService(db).remove_member(project_id, member_id, user)
+    record_audit(db, user["user_id"], "delete", "member", str(project_id), {"member_id": member_id})
     return ok(message="已移除")

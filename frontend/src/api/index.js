@@ -98,6 +98,8 @@ export const resetPassword = (id, new_password) => request.post(`/users/${id}/re
 export const deleteUser = (id) => request.delete(`/users/${id}`)
 export const listConfig = () => request.get('/config')
 export const setConfig = (key, value) => request.put(`/config/${key}`, { value })
+export const listAuditLogs = (params) => request.get('/admin/audit-logs', { params })
+export const getAuditMeta = () => request.get('/admin/audit-meta')
 export const triggerBackup = () => request.post('/backup')
 export const listBackups = () => request.get('/backups')
 export const importPreview = (formData) => request.post('/import/excel/preview', formData, { headers: { 'Content-Type': 'multipart/form-data' } })

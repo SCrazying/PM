@@ -31,6 +31,10 @@ def list_progress(project_id: int, date_from: date | None = None, date_to: date 
 def create_progress(project_id: int, body: ProgressCreate, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     p = ProgressService(db).create_progress(project_id, body, user)
     db.commit()
+    record_audit(db, user["user_id"], "create", "progress", str(p.id),
+                 {"project_id": project_id, "date": str(p.progress_date),
+                  "today_work": p.today_work, "tomorrow_plan": p.tomorrow_plan,
+                  "risk": p.risk, "project_node_id": p.project_node_id})
     return ok({"id": p.id}, message="填报成功")
 
 
@@ -45,6 +49,7 @@ def update_progress(progress_id: int, body: ProgressUpdate, user: dict = Depends
 @router.delete("/progress/{progress_id}")
 def delete_progress(progress_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     ProgressService(db).delete_progress(progress_id, user)
+    record_audit(db, user["user_id"], "delete", "progress", str(progress_id))
     return ok(message="已删除")
 
 
@@ -52,6 +57,7 @@ def delete_progress(progress_id: int, user: dict = Depends(get_current_user), db
 def set_risk_resolved(progress_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     p = ProgressService(db).set_risk_resolved(progress_id, bool(body.get("resolved")), user)
     db.commit()
+    record_audit(db, user["user_id"], "update", "progress", str(progress_id), {"risk_resolved": bool(body.get("resolved"))})
     return ok({"id": p.id, "resolved": p.risk_resolved}, message="已关闭风险" if p.risk_resolved else "已重新打开")
 
 
@@ -77,6 +83,8 @@ def get_weekly_goal(project_id: int, week_start: date = Query(...), user: dict =
 @router.put("/projects/{project_id}/weekly-goal")
 def set_weekly_goal(project_id: int, body: WeeklyGoalIn, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     row = ProgressService(db).set_weekly_goal(project_id, body.week_start, body.goal, user)
+    record_audit(db, user["user_id"], "update", "weekly_goal", str(project_id),
+                 {"week_start": str(body.week_start), "goal": body.goal})
     return ok({"id": row.id, "week_start": row.week_start}, message="已保存")
 
 
@@ -98,6 +106,10 @@ def add_weekly_goal_item(project_id: int, body: dict, user: dict = Depends(get_c
         raise BizException("周次格式不正确（应为 YYYY-MM-DD）")
     item = ProgressService(db).add_weekly_goal_item(
         project_id, ws, goal, body.get("deadline"), body.get("user_id"), user)
+    record_audit(db, user["user_id"], "create", "weekly_goal", str(item.id),
+                 {"project_id": project_id, "week_start": str(ws), "goal": goal,
+                  "deadline": str(body.get("deadline") or "")[:10] if body.get("deadline") else None,
+                  "user_id": body.get("user_id")})
     return ok({"id": item.id}, message="已添加")
 
 
@@ -105,18 +117,23 @@ def add_weekly_goal_item(project_id: int, body: dict, user: dict = Depends(get_c
 def update_weekly_goal_item(item_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     item = ProgressService(db).update_weekly_goal_item(
         item_id, body.get("goal"), body.get("deadline"), body.get("user_id"), body.get("week_start"), user)
+    record_audit(db, user["user_id"], "update", "weekly_goal", str(item_id),
+                 {"goal": body.get("goal"), "deadline": str(body.get("deadline") or "")[:10] if body.get("deadline") else None,
+                  "user_id": body.get("user_id"), "week_start": str(body.get("week_start") or "")[:10] if body.get("week_start") else None})
     return ok({"id": item.id}, message="已更新")
 
 
 @router.patch("/weekly-goal-items/{item_id}/done")
 def set_weekly_goal_item_done(item_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     item = ProgressService(db).set_weekly_goal_item_done(item_id, bool(body.get("done")), user)
+    record_audit(db, user["user_id"], "update", "weekly_goal", str(item_id), {"done": bool(body.get("done"))})
     return ok({"id": item.id, "done": item.done, "done_at": item.done_at}, message="已更新")
 
 
 @router.delete("/weekly-goal-items/{item_id}")
 def delete_weekly_goal_item(item_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     ProgressService(db).delete_weekly_goal_item(item_id, user)
+    record_audit(db, user["user_id"], "delete", "weekly_goal", str(item_id))
     return ok(message="已删除")
 
 
@@ -207,6 +224,7 @@ def node_transition(node_id: int, body: dict, user: dict = Depends(get_current_u
 @router.post("/nodes/{node_id}/advance")
 def node_advance(node_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     n = NodeFlowService(db).advance_to_next(node_id, user)
+    record_audit(db, user["user_id"], "update", "node", str(node_id), {"status": n.status, "action": "advance"})
     return ok({"id": n.id, "status": n.status}, message="已进入下一节点")
 
 
