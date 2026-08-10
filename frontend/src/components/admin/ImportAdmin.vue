@@ -48,7 +48,7 @@
     </div>
 
     <!-- 结果 -->
-    <el-dialog v-model="resultVisible" title="导入结果" width="560px" :close-on-click-modal="false">
+    <el-dialog v-model="resultVisible" title="导入结果" width="700px" :close-on-click-modal="false">
       <el-result icon="success" title="导入完成" :sub-title="`成功导入 ${result.created} 个项目${result.failed?.length ? `，失败 ${result.failed.length} 个` : ''}`" />
       <div v-for="(f, i) in result.failed" :key="i" class="pv-warn-line">✗ {{ f.project }}：{{ f.error }}</div>
     </el-dialog>

@@ -21,7 +21,7 @@
     </div>
     <div v-else class="empty">暂无资料</div>
 
-    <el-dialog v-model="dialogVisible" title="上传项目资料" width="520px" :close-on-click-modal="false">
+    <el-dialog v-model="dialogVisible" title="上传项目资料" width="620px" :close-on-click-modal="false">
       <el-form label-width="80px">
         <el-form-item label="分类">
           <el-select v-model="category" style="width:100%">
@@ -91,11 +91,19 @@ async function onUpload() {
   }
 }
 
-function onDownload(f) {
-  const a = document.createElement('a')
-  a.href = downloadAttachment(f.id)
-  a.download = f.file_name
-  a.click()
+async function onDownload(f) {
+  try {
+    // 走 axios（带 Authorization），避免 <a href> 直接跳转 401
+    const blob = await downloadAttachment(f.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = f.file_name
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '下载失败')
+  }
 }
 
 async function onDelete(f) {

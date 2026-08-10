@@ -13,22 +13,24 @@
             <el-tag size="small" type="info">{{ filledCount }}/{{ todo.projects.length }} 已填</el-tag>
           </div>
           <div v-if="!todo.projects.length" class="empty">暂无参与的在研项目</div>
-          <div v-for="p in todo.projects" :key="p.id" class="todo-proj" @click="openFill(p)">
-            <div class="tp-left">
-              <span class="pm-dot" :class="p.filled_today ? 'success' : 'warning'"></span>
-              <div>
-                <div class="tp-name">{{ p.name }}</div>
-                <div class="pm-sub">{{ p.code }} · {{ p.project_role || '成员' }}</div>
-                <div class="pm-sub" v-if="p.current_node_name">
-                  当前节点：{{ p.current_node_key }} {{ p.current_node_name }}
-                  <span v-if="p.node_planned_end"> · 计划至 {{ p.node_planned_end }}</span>
+          <div v-else class="proj-list">
+            <div v-for="p in todo.projects" :key="p.id" class="todo-proj" @click="openFill(p)">
+              <div class="tp-left">
+                <span class="pm-dot" :class="p.filled_today ? 'success' : 'warning'"></span>
+                <div>
+                  <div class="tp-name">{{ p.name }}</div>
+                  <div class="pm-sub">{{ p.code }} · {{ p.project_role || '成员' }}</div>
+                  <div class="pm-sub" v-if="p.current_node_name">
+                    当前节点：{{ p.current_node_key }} {{ p.current_node_name }}
+                    <span v-if="p.node_planned_end"> · 计划至 {{ p.node_planned_end }}</span>
+                    <span v-if="p.node_overdue" class="node-overdue">（超期）</span>
+                  </div>
                 </div>
               </div>
+              <el-tag size="small" :type="p.filled_today ? 'success' : 'warning'" effect="plain">
+                {{ p.filled_today ? '已填报' : '待填报' }}
+              </el-tag>
             </div>
-            <el-tag v-if="p.node_overdue" size="small" type="warning" effect="plain">节点超期</el-tag>
-            <el-tag v-else size="small" :type="p.filled_today ? 'success' : 'warning'" effect="plain">
-              {{ p.filled_today ? '已填报' : '待填报' }}
-            </el-tag>
           </div>
         </div>
 
@@ -64,13 +66,13 @@
             <div class="sec-h">当日报工（{{ selectedDayProgress.length }} 条）</div>
             <div v-for="p in selectedDayProgress" :key="p.id" class="recent-progress">
               <div class="recent-head">
-                <div><b>{{ p.project_name }}</b><span class="pm-sub"> · {{ p.progress_date }}</span></div>
+                <div class="rh-left">
+                  <b class="rp-project">{{ p.project_name }}</b>
+                  <span class="pm-sub rp-date"> {{ p.progress_date }}</span>
+                </div>
                 <el-button link type="primary" size="small" @click="openRecentEdit(p)">编辑</el-button>
               </div>
-              <div class="recent-node pm-sub">{{ p.node_name || '项目级进展' }}</div>
               <div class="recent-work">{{ p.today_work }}</div>
-              <div v-if="p.tomorrow_plan" class="pm-sub plan-line">明日：{{ p.tomorrow_plan }}</div>
-              <div v-if="p.risk" class="risk">⚠ {{ p.risk }}</div>
             </div>
           </div>
           <div v-else class="empty">点击日历日期查看该天报工</div>
@@ -121,7 +123,7 @@
       </el-col>
     </el-row>
 
-    <el-dialog v-model="progressEditVisible" title="编辑进展" width="620px" :close-on-click-modal="false">
+    <el-dialog v-model="progressEditVisible" title="编辑进展" width="740px" :close-on-click-modal="false">
       <el-form :model="progressEditForm" label-width="80px">
         <el-form-item label="日期"><span>{{ progressEditForm.progress_date }}</span></el-form-item>
         <el-form-item label="所属节点"><span>{{ progressEditForm.node_name || '项目级' }}</span></el-form-item>
@@ -268,12 +270,22 @@ onMounted(() => { load(); loadMonth() })
 .plan-line { margin-top: 3px; }
 .cal-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
 .cal-cell.has { cursor: pointer; }
-.cal-day { font-size: 13px; }
+.cal-day { font-size: 12px; }
 .cal-cell.has .cal-day { font-weight: 700; color: var(--pm-primary); }
-.cal-dots { display: flex; margin-top: 2px; }
-.cal-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pm-primary); }
-.el-calendar .el-calendar-table .el-calendar-day { height: 46px; padding: 2px; }
-.day-progress { max-height: 280px; overflow-y: auto; }
+.cal-dots { display: flex; margin-top: 1px; }
+.cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--pm-primary); }
+.el-calendar { --el-calendar-cell-width: 100%; }
+.el-calendar .el-calendar-table .el-calendar-day { height: 36px; padding: 1px; }
+.el-calendar .el-calendar-table td.is-selected .el-calendar-day { background: var(--pm-primary-lighter); }
+.day-progress { max-height: 260px; overflow-y: auto; }
+.proj-list { max-height: 340px; overflow-y: auto; }
+.node-overdue { color: var(--pm-danger); font-weight: 600; }
+.rh-left { min-width: 0; }
+.rp-project { font-weight: 600; font-size: 13px; }
+.recent-progress { padding: 8px 2px; border-bottom: 1px solid var(--pm-border); }
+.recent-progress:last-child { border-bottom: none; }
+.recent-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.recent-work { font-size: 13px; line-height: 1.5; margin-top: 3px; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; color: var(--pm-text-2); }
 .todo-proj {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 11px 12px; border-radius: 10px; cursor: pointer;
@@ -289,11 +301,6 @@ onMounted(() => { load(); loadMonth() })
 .todo-task:hover { background: var(--pm-primary-lighter); }
 .todo-task:last-child { border-bottom: none; }
 .tt-title { font-size: 14px; }
-.recent-progress { padding: 10px 0; border-bottom: 1px solid var(--pm-border); }
-.recent-progress:last-child { border-bottom: none; }
-.recent-head { display: flex; align-items: center; justify-content: space-between; }
-.recent-node { margin-top: 4px; }
-.recent-work { font-size: 13px; line-height: 1.6; margin-top: 4px; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }
 .risk { color: var(--pm-danger); font-size: 12px; margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
 .fill-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 60px 24px; }
 .fill-placeholder .card-title { margin-top: 14px; }

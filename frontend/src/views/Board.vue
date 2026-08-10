@@ -54,7 +54,7 @@
           <div class="dash-h">未关闭风险（近 30 天 {{ summary.risk_count }}）</div>
           <div v-if="summary.risks.length" class="dash-list">
             <div v-for="r in summary.risks" :key="r.progress_id" class="dash-item risk-item">
-              <span class="dash-tag">{{ r.project_name }}</span>
+              <span class="dash-tag risk-link" @click="goDetail({ id: r.project_id })">{{ r.project_name }}</span>
               <span class="dash-risk">{{ r.risk }}</span>
               <span class="dash-sub">[{{ r.date }}] {{ r.author }}</span>
             </div>
@@ -219,7 +219,10 @@ async function load() {
     summary.value = await getBoardSummary()
   } finally { loading.value = false }
 }
-onMounted(load)
+onMounted(async () => {
+  machineOptions.value = await listMachineOptions().catch(() => [])
+  load()
+})
 function goDetail(p) { router.push({ name: 'project-detail', params: { id: p.id } }) }
 
 // ---------- 拖拽换状态 ----------
@@ -286,6 +289,8 @@ async function onColDrop(toKey) {
 .dash-sub { color: var(--pm-text-2); font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-date { color: var(--pm-text-3); font-size: 12px; flex-shrink: 0; }
 .dash-tag { background: var(--pm-primary-light); color: var(--pm-primary); font-size: 12px; padding: 1px 8px; border-radius: 6px; flex-shrink: 0; }
+.risk-link { cursor: pointer; }
+.risk-link:hover { background: var(--pm-primary); color: #fff; }
 .dash-risk { font-size: 12.5px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .risk-item .dash-tag { background: var(--pm-st-delayed-bg); color: var(--pm-st-delayed-fg); }
 .dash-empty { color: var(--pm-text-3); font-size: 13px; padding: 12px 0; text-align: center; }

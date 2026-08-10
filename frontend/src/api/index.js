@@ -85,7 +85,7 @@ export const editAiSummary = (id, data) => request.put(`/ai-summaries/${id}`, da
 // 附件
 export const uploadAttachment = (formData) => request.post('/attachments', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const listAttachments = (projectId) => request.get(`/projects/${projectId}/attachments`)
-export const downloadAttachment = (id) => `/api/v1/attachments/${id}/download`
+export const downloadAttachment = (id) => request.get(`/attachments/${id}/download`, { responseType: 'blob' })
 export const deleteAttachment = (id) => request.delete(`/attachments/${id}`)
 
 // 用户 / 配置 / 备份 / 导入

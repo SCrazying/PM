@@ -32,7 +32,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="visible" :title="form.id ? '编辑用户' : '新建用户'" width="540px" :close-on-click-modal="false">
+    <el-dialog v-model="visible" :title="form.id ? '编辑用户' : '新建用户'" width="660px" :close-on-click-modal="false">
       <el-form :model="form" label-width="80px">
         <el-form-item label="用户名" required><el-input v-model="form.username" :disabled="!!form.id" /></el-form-item>
         <el-form-item label="姓名" required><el-input v-model="form.display_name" /></el-form-item>

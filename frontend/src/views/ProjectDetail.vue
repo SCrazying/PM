@@ -192,7 +192,7 @@
           <div v-else class="empty">暂无风险</div>
         </div>
 
-        <el-dialog v-model="riskVisible" title="添加风险" width="480px" :close-on-click-modal="false">
+        <el-dialog v-model="riskVisible" title="添加风险" width="580px" :close-on-click-modal="false">
           <el-form label-width="70px">
             <el-form-item label="风险" required>
               <el-input v-model="riskForm.risk" type="textarea" :rows="3" placeholder="描述当前风险/阻塞（可在进展中随时关闭）" />
@@ -212,8 +212,6 @@
                 <div class="pl-work">{{ p.today_work }}</div>
                 <el-button v-if="canEditProgress(p)" link type="primary" size="small" @click="openProgressEdit(p)">编辑</el-button>
               </div>
-              <div v-if="p.tomorrow_plan" class="pm-sub progress-plan">明日：{{ p.tomorrow_plan }}</div>
-              <div v-if="p.risk" class="risk">⚠ {{ p.risk }}</div>
             </el-timeline-item>
           </el-timeline>
           <div v-else class="empty">暂无进展</div>
@@ -222,7 +220,7 @@
     </el-row>
 
     <!-- 任务弹窗 -->
-    <el-dialog v-model="taskVisible" :title="taskForm.id ? '编辑任务' : '新建任务'" width="560px" :close-on-click-modal="false">
+    <el-dialog v-model="taskVisible" :title="taskForm.id ? '编辑任务' : '新建任务'" width="680px" :close-on-click-modal="false">
       <el-form :model="taskForm" label-width="80px">
         <el-form-item label="任务" required><el-input v-model="taskForm.title" /></el-form-item>
         <el-form-item label="指派人">
@@ -241,7 +239,7 @@
     </el-dialog>
 
     <!-- 子节点弹窗 -->
-    <el-dialog v-model="subnodeVisible" :title="subnodeForm.id ? '编辑子节点' : '添加子节点'" width="520px" :close-on-click-modal="false">
+    <el-dialog v-model="subnodeVisible" :title="subnodeForm.id ? '编辑子节点' : '添加子节点'" width="600px" :close-on-click-modal="false">
       <el-form :model="subnodeForm" label-width="80px">
         <el-form-item label="名称" required><el-input v-model="subnodeForm.name" placeholder="子节点名称" /></el-form-item>
         <el-form-item label="截止时间">
@@ -255,7 +253,7 @@
     </el-dialog>
 
     <!-- 评审弹窗 -->
-    <el-dialog v-model="reviewVisible" title="节点评审" width="540px" :close-on-click-modal="false">
+    <el-dialog v-model="reviewVisible" title="节点评审" width="660px" :close-on-click-modal="false">
       <el-form label-width="80px">
         <el-form-item label="节点"><b>{{ currentNode?.node_key }} {{ currentNode?.name }}</b></el-form-item>
         <el-form-item label="结论">
@@ -276,7 +274,7 @@
     </el-dialog>
 
     <!-- 周目标条目弹窗 -->
-    <el-dialog v-model="goalVisible" :title="goalForm.id ? '编辑目标条目' : '添加目标条目'" width="540px" :close-on-click-modal="false">
+    <el-dialog v-model="goalVisible" :title="goalForm.id ? '编辑目标条目' : '添加目标条目'" width="660px" :close-on-click-modal="false">
       <el-form label-width="80px">
         <el-form-item label="目标" required>
           <el-input v-model="goalForm.goal" type="textarea" :rows="2" placeholder="本周目标条目" />
@@ -303,7 +301,7 @@
     </el-dialog>
 
     <!-- 添加成员弹窗 -->
-    <el-dialog v-model="memberVisible" title="添加成员" width="520px" :close-on-click-modal="false">
+    <el-dialog v-model="memberVisible" title="添加成员" width="600px" :close-on-click-modal="false">
       <el-form label-width="80px">
         <el-form-item label="成员">
           <el-select v-model="memberForm.user_id" filterable style="width:100%">
@@ -319,7 +317,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="progressVisible" title="编辑进展" width="620px" :close-on-click-modal="false">
+    <el-dialog v-model="progressVisible" title="编辑进展" width="740px" :close-on-click-modal="false">
       <el-form :model="progressForm" label-width="80px">
         <el-form-item label="日期"><span>{{ progressForm.progress_date }}</span></el-form-item>
         <el-form-item label="所属节点"><span>{{ progressForm.node_name || '项目级' }}</span></el-form-item>
