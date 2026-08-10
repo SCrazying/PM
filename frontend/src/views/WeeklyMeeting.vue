@@ -260,13 +260,17 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { groupWeekly, projectWeekly, listProjects, listUserOptions, exportLedger, setSubnodeStatus, setProgressRiskResolved, setWeeklyGoalItemDone } from '../api'
-import { todayStr } from '../utils/date'
+import { fmtDate, mondayOf, todayStr } from '../utils/date'
 import { ElMessage } from 'element-plus'
 import { useViewFilterStore } from '../store/filters'
 
 const router = useRouter()
 const viewFilters = useViewFilterStore()
-const weekStart = computed({ get: () => viewFilters.weekly.weekStart, set: (v) => { viewFilters.weekly.weekStart = v } })
+// weekStart 强制规整到周一：无论 date-picker 返回周日/周一，都与项目详情/后端周一口径一致
+const weekStart = computed({
+  get: () => viewFilters.weekly.weekStart,
+  set: (v) => { viewFilters.weekly.weekStart = v ? fmtDate(mondayOf(v)) : v },
+})
 const view = computed({ get: () => viewFilters.weekly.view, set: (v) => { viewFilters.weekly.view = v } })
 
 // 重置筛选回默认值（机型/状态/角色/按人/周次回本周）

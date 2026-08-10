@@ -1,6 +1,6 @@
 import { reactive, watch } from 'vue'
 import { defineStore } from 'pinia'
-import { thisWeekStart } from '../utils/date'
+import { fmtDate, mondayOf, thisWeekStart } from '../utils/date'
 
 // 下拉筛选持久化：跨视图切换 + 刷新页面均保留；提供 reset(key) 重置回默认值
 // columns：各列表/视图的列显示配置（独立于筛选，reset 不清空，恢复默认用 resetColumns）
@@ -33,7 +33,12 @@ export const useViewFilterStore = defineStore('viewFilters', () => {
   // 与上次持久化的值合并（saved 覆盖默认值），刷新后不丢筛选
   const board = reactive({ ...d.board, ...(saved.board || {}) })
   const projectList = reactive({ ...d.projectList, ...(saved.projectList || {}) })
-  const weekly = reactive({ ...d.weekly, ...(saved.weekly || {}) })
+  // weekStart 强制规整到周一：兼容历史保存的周日起始值，确保与项目详情/后端周一口径一致
+  const weekly = reactive({
+    ...d.weekly,
+    ...(saved.weekly || {}),
+    weekStart: fmtDate(mondayOf(saved.weekly?.weekStart || d.weekly.weekStart)),
+  })
   // 列显示配置：有历史值用之，否则回默认全显示
   const columns = reactive({
     projectList: Array.isArray(saved.columns?.projectList) ? [...saved.columns.projectList] : [...DEFAULT_COLUMNS.projectList],
