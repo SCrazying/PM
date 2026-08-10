@@ -19,7 +19,7 @@ from app.core.responses import BizException, ForbiddenError, NotFoundError, ok, 
 from app.core.storage import get_storage
 from app.engines.ai_engine import AiService
 from app.models.misc import Attachment, Config
-from app.models.project import Project, TrTemplate, TrTemplateNode
+from app.models.project import Project, ProjectMember, TrTemplate, TrTemplateNode
 from app.models.user import User
 from app.schemas.project import RecycleBatchIn
 from app.services.audit_service import record_audit
@@ -87,6 +87,16 @@ async def upload_attachment(project_id: int = Form(...), project_node_id: int = 
                             user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     if not (project_node_id or task_id or review_id or category):
         raise BizException("附件须关联节点/任务/评审之一，或指定资料分类")
+    # 校验项目存在 + 上传权限（admin/负责人/成员）
+    project = db.get(Project, project_id)
+    if not project or project.is_deleted:
+        raise NotFoundError("项目不存在")
+    if not (user["role"] == "admin" or project.owner_id == user["user_id"] or db.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id, ProjectMember.user_id == user["user_id"],
+            ProjectMember.is_deleted.is_(False))
+    ).scalar_one_or_none()):
+        raise ForbiddenError("仅项目成员/负责人可上传资料")
     ext = (file.filename.rsplit(".", 1)[-1] or "").lower()
     if ext not in ALLOWED_EXT:
         raise BizException(f"不支持的文件类型 .{ext}")
@@ -126,7 +136,10 @@ def download_attachment(aid: int, user: dict = Depends(get_current_user), db: Se
     att = db.get(Attachment, aid)
     if not att or att.is_deleted:
         raise NotFoundError("附件不存在")
-    path = get_storage().get_path(att.file_path)
+    try:
+        path = get_storage().get_path(att.file_path)
+    except Exception:  # noqa: BLE001  MinIO 下载失败/对象缺失
+        raise NotFoundError("附件文件缺失")
     if not os.path.exists(path):
         raise NotFoundError("附件文件缺失")
     record_audit(db, user["user_id"], "export", "attachment", str(aid), {"file": att.file_name})
