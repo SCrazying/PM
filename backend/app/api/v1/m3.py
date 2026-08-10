@@ -24,7 +24,7 @@ from app.models.misc import Attachment, AuditLog, Config
 from app.models.project import Project, ProjectMember, TrTemplate, TrTemplateNode
 from app.models.user import User
 from app.schemas.project import RecycleBatchIn
-from app.services.audit_service import record_audit
+from app.services.audit_service import cleanup_expired, record_audit
 from app.services.personal_service import PersonalService
 from app.services.project_service import ProjectService
 
@@ -432,6 +432,14 @@ def audit_meta(user: dict = Depends(require_admin), db: Session = Depends(get_db
     actions = [r[0] for r in db.execute(select(AuditLog.action).distinct()).all()]
     target_types = [r[0] for r in db.execute(select(AuditLog.target_type).distinct()).all()]
     return ok({"actions": actions, "target_types": [t for t in target_types if t]})
+
+
+@router.post("/admin/audit-logs/cleanup")
+def cleanup_audit_logs(user: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    """手动清理过期审计日志（按保留期配置）。"""
+    n = cleanup_expired(db)
+    record_audit(db, user["user_id"], "delete", "audit_log", None, {"deleted": n})
+    return ok({"deleted": n}, message=f"已清理 {n} 条过期日志")
 
 
 @router.get("/admin/audit-logs/export")

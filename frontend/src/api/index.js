@@ -101,6 +101,7 @@ export const setConfig = (key, value) => request.put(`/config/${key}`, { value }
 export const listAuditLogs = (params) => request.get('/admin/audit-logs', { params })
 export const getAuditMeta = () => request.get('/admin/audit-meta')
 export const exportAuditLogs = (params) => request.get('/admin/audit-logs/export', { params, responseType: 'blob' })
+export const cleanupAuditLogs = () => request.post('/admin/audit-logs/cleanup')
 export const triggerBackup = () => request.post('/backup')
 export const listBackups = () => request.get('/backups')
 export const importPreview = (formData) => request.post('/import/excel/preview', formData, { headers: { 'Content-Type': 'multipart/form-data' } })

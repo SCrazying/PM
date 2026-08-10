@@ -16,6 +16,7 @@
       <el-button type="primary" @click="load(1)">查询</el-button>
       <el-button @click="onReset">重置</el-button>
       <el-button type="success" plain :loading="exporting" @click="exportCsv">导出</el-button>
+      <el-button type="danger" plain :loading="cleaning" @click="cleanup">清理过期</el-button>
     </div>
     <el-table :data="rows" v-loading="loading" border stripe size="small">
       <el-table-column label="时间" width="170">
@@ -49,21 +50,28 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { exportAuditLogs, getAuditMeta, listAuditLogs } from '../../api'
+import { cleanupAuditLogs, exportAuditLogs, getAuditMeta, listAuditLogs } from '../../api'
 
 const loading = ref(false)
 const exporting = ref(false)
+const cleaning = ref(false)
 const rows = ref([])
 const total = ref(0)
 const meta = reactive({ actions: [], target_types: [] })
 const query = reactive({ actor: '', action: '', target_type: '', target_id: '', page: 1, size: 20 })
 const dateRange = ref(null)
 
-const actionMap = { create: '新增', update: '修改', delete: '删除', review: '评审', export: '导出', import: '导入', backup: '备份', restore: '恢复', purge: '彻底删除', config_change: '配置变更' }
+const actionMap = {
+  create: '新增', update: '修改', delete: '删除', review: '评审', export: '导出', import: '导入',
+  backup: '备份', restore: '恢复', purge: '彻底删除', config_change: '配置变更',
+  login: '登录', logout: '登出', login_failed: '登录失败', account_locked: '账号锁定',
+  reset_password: '重置密码', force_transition: '强制流转',
+}
 const targetMap = {
   project: '项目', project_risk: '项目风险', task: '任务', node: '节点', user: '用户', machine_model: '机型',
   tr_template: '模板', member: '成员', progress: '进展', weekly_goal: '周目标', attachment: '附件',
-  config: '配置', project_ledger: '台账', system: '系统', ai_summary: 'AI总结', subnode: '子节点', role: '角色',
+  config: '配置', project_ledger: '台账', system: '系统', ai_summary: 'AI总结', subnode: '子节点',
+  role: '角色', notification: '通知',
 }
 const actionText = (a) => actionMap[a] || a
 const targetText = (t) => targetMap[t] || t
@@ -101,6 +109,19 @@ function onReset() {
   Object.assign(query, { actor: '', action: '', target_type: '', target_id: '', page: 1, size: 20 })
   dateRange.value = null
   load(1)
+}
+
+async function cleanup() {
+  cleaning.value = true
+  try {
+    const r = await cleanupAuditLogs()
+    ElMessage.success(r?.message || '已清理')
+    load(1)
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '清理失败')
+  } finally {
+    cleaning.value = false
+  }
 }
 
 async function exportCsv() {
