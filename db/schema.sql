@@ -294,7 +294,7 @@ CREATE TABLE attachment (
     file_name       VARCHAR(255) NOT NULL,
     file_path       VARCHAR(512) NOT NULL,
     file_size       BIGINT,
-    mime_type       VARCHAR(64),
+    mime_type       VARCHAR(255),                                -- xlsx 的 MIME 长达 65 字符，需 >64
     uploaded_by     BIGINT REFERENCES "user"(id) ON DELETE RESTRICT,
     uploaded_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     is_deleted      BOOLEAN NOT NULL DEFAULT FALSE,
