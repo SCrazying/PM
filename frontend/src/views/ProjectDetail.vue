@@ -350,7 +350,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addMember, addReview, addSubnode, addWeeklyGoalItem, createTask, deleteSubnode, deleteTask,
-  deleteWeeklyGoalItem, addProjectRisk, deleteProjectRisk, getProject, listMembers, listProgress, listProjectRisks, listReviews, listTasks,
+  deleteWeeklyGoalItem, addProjectRisk, deleteProjectRisk, getProject, getReportWeeks, listMembers, listProgress, listProjectRisks, listReviews, listTasks,
   listUserOptions, nodeAdvance, nodeComplete, nodeCompletion, projectCompletion,
   projectWeekly, removeMember, setProgressRiskResolved, setProjectRiskResolved, setSubnodeStatus, setTaskStatus, setWeeklyGoalItemDone,
   updateProgress, updateSubnode, updateTask, updateWeeklyGoalItem,
@@ -358,7 +358,7 @@ import {
 import { useUserStore } from '../store/user'
 import ProjectForm from '../components/ProjectForm.vue'
 import ProjectFiles from '../components/ProjectFiles.vue'
-import { buildWeekOptions, fmtDate, mondayOf, thisWeekStart } from '../utils/date'
+import { buildWeekOptions, fmtDate, mergeWeekOptions, mondayOf, thisWeekStart } from '../utils/date'
 
 const route = useRoute()
 const store = useUserStore()
@@ -678,7 +678,13 @@ async function openProjectEdit() {
   if (project.value && editFormRef.value) await editFormRef.value.open(project.value)
 }
 
-onMounted(loadAll)
+onMounted(async () => {
+  try {
+    // 并入所有有数据的周，超出固定范围的历史/未来周也能下拉选到
+    weekOptions.value = mergeWeekOptions(weekOptions.value, await getReportWeeks())
+  } catch { /* 保留固定范围 */ }
+  loadAll()
+})
 </script>
 
 <style scoped>

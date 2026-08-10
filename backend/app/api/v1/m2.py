@@ -3,6 +3,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -11,6 +12,7 @@ from app.core.responses import ok
 from app.engines.board_engine import BoardService
 from app.engines.node_flow_engine import NodeFlowService
 from app.engines.report_engine import ReportService
+from app.models.misc import Progress, ProjectWeeklyGoal, WeeklyGoalItem
 from app.schemas.progress import ProgressCreate, ProgressUpdate, WeeklyGoalIn
 from app.services.audit_service import record_audit
 from app.services.progress_service import ProgressService
@@ -112,6 +114,27 @@ def delete_weekly_goal_item(item_id: int, user: dict = Depends(get_current_user)
 
 
 # ---------- 周报 ----------
+@router.get("/reports/weeks")
+def report_weeks(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """所有有数据的周（周一）：目标 + 进展涉及的周，供周下拉补全，避免固定范围看不到超期数据。"""
+    ps = ProgressService(db)
+    weeks = set()
+    for (w,) in db.execute(select(WeeklyGoalItem.week_start).distinct()):
+        if w:
+            weeks.add(w)
+    for (w,) in db.execute(
+        select(ProjectWeeklyGoal.week_start).where(ProjectWeeklyGoal.is_deleted.is_(False)).distinct()
+    ):
+        if w:
+            weeks.add(w)
+    for (d,) in db.execute(
+        select(Progress.progress_date).where(Progress.is_deleted.is_(False)).distinct()
+    ):
+        if d:
+            weeks.add(ps.week_start_of(d))
+    return ok([str(w) for w in sorted(weeks)])
+
+
 @router.get("/reports/projects/{project_id}/weekly")
 def project_weekly(project_id: int, week_start: date = Query(...), user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     return ok(ReportService(db).project_weekly(project_id, week_start))

@@ -48,3 +48,16 @@ export function buildWeekOptions(past = 12, future = 12) {
   }
   return opts
 }
+
+// 把"有数据的周"（周一列表）并入周次选项，保证超出固定范围的历史/未来周也能选到
+export function mergeWeekOptions(opts, extraWeeks) {
+  const have = new Set(opts.map((o) => o.value))
+  const extra = (extraWeeks || [])
+    .map((w) => String(w))
+    .filter((w) => w && !have.has(w))
+    .map((w) => {
+      const m = mondayOf(w); const e = new Date(m); e.setDate(e.getDate() + 6)
+      return { value: fmtDate(m), label: `${fmtDate(m).slice(5)}~${fmtDate(e).slice(5)}` }
+    })
+  return [...opts, ...extra].sort((a, b) => a.value.localeCompare(b.value))
+}

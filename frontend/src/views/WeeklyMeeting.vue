@@ -260,15 +260,15 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { groupWeekly, projectWeekly, listProjects, listUserOptions, exportLedger, setSubnodeStatus, setProgressRiskResolved, setWeeklyGoalItemDone } from '../api'
-import { buildWeekOptions, fmtDate, mondayOf, todayStr } from '../utils/date'
+import { groupWeekly, projectWeekly, listProjects, listUserOptions, exportLedger, getReportWeeks, setSubnodeStatus, setProgressRiskResolved, setWeeklyGoalItemDone } from '../api'
+import { buildWeekOptions, fmtDate, mergeWeekOptions, mondayOf, todayStr } from '../utils/date'
 import { ElMessage } from 'element-plus'
 import { useViewFilterStore } from '../store/filters'
 
 const router = useRouter()
 const viewFilters = useViewFilterStore()
-// 周次下拉选项（前12~未来12周，value 一律周一，避免 date-picker 周首歧义错位）
-const weekOptions = buildWeekOptions()
+// 周次下拉选项（前12~未来12周 + 动态并入有数据的周，避免超范围数据看不到）
+const weekOptions = ref(buildWeekOptions())
 // weekStart 强制规整到周一，与项目详情/后端周一口径一致
 const weekStart = computed({
   get: () => viewFilters.weekly.weekStart,
@@ -501,6 +501,10 @@ async function downloadLedger(type = 'weekly') {
 
 onMounted(async () => {
   memberUsers.value = await listUserOptions()
+  try {
+    // 并入所有有数据的周，超出固定范围的历史/未来周也能下拉选到
+    weekOptions.value = mergeWeekOptions(weekOptions.value, await getReportWeeks())
+  } catch { /* 拉取失败保留固定范围 */ }
   load()
 })
 </script>
