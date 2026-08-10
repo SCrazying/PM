@@ -24,7 +24,6 @@ const exemptIds = ref([])
 const saving = ref(false)
 
 async function load() {
-async function load() {
   try {
     users.value = await listUserOptions()
     const rows = await listConfig()
