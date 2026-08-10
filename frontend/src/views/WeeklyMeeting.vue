@@ -383,10 +383,10 @@ function goDetail(project) {
 // 短日期 MM-DD
 const shortDate = (d) => (d ? String(d).slice(5) : '')
 
-// 每日进展列：把 p.daily 展平成有序列表（日期倒序）；有风险的进展固定排最后一行，且不被截断
+// 每日进展列：把 p.daily 展平成有序列表（日期正序，周一~周日）；有风险的进展固定排最后一行，且不被截断
 function dailyItems(row) {
   const todayIso = todayStr()
-  let dates = Object.keys(row.daily || {}).sort().reverse()
+  let dates = Object.keys(row.daily || {}).sort()
   if (dailyTodayOnly.value) dates = dates.filter((d) => d === todayIso)
   const items = []
   for (const d of dates) {

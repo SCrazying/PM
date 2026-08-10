@@ -45,8 +45,14 @@ export const useViewFilterStore = defineStore('viewFilters', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ board, projectList, weekly, columns }))
   }, { deep: true })
 
-  // 重置指定页面筛选为默认值（周会视图周次重置为本周）
+  // 重置指定页面筛选为默认值
+  // 周会视图例外：保留当前查看的周次（weekStart），只清筛选——否则翻看历史周时重置会强切回本周，目标看似"清空"
   function reset(key) {
+    if (key === 'weekly') {
+      const ws = weekly.weekStart
+      Object.assign(weekly, DEFAULTS().weekly, { weekStart: ws })
+      return
+    }
     Object.assign({ board, projectList, weekly }[key], DEFAULTS()[key])
   }
 
