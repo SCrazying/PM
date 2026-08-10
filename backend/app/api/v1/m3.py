@@ -58,12 +58,15 @@ def gen_ai_summary(user_id: int, body: dict, user: dict = Depends(get_current_us
     period = body.get("period", "month")
     ref = date.fromisoformat(body["date"]) if body.get("date") else date.today()
     row = AiService(db).generate(user_id, period, ref, user["user_id"])
+    record_audit(db, user["user_id"], "create", "ai_summary", str(row.id),
+                 {"user_id": user_id, "period": period, "status": row.status})
     return ok({"id": row.id, "status": row.status, "model": row.model}, message="已生成")
 
 
 @router.put("/ai-summaries/{sid}")
 def edit_ai_summary(sid: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     row = AiService(db).edit(sid, body.get("edited_content", ""), user)
+    record_audit(db, user["user_id"], "update", "ai_summary", str(sid))
     return ok({"id": row.id, "status": row.status}, message="已保存")
 
 
@@ -111,6 +114,8 @@ async def upload_attachment(project_id: int = Form(...), project_node_id: int = 
     db.add(att)
     db.commit()
     db.refresh(att)
+    record_audit(db, user["user_id"], "create", "attachment", str(att.id),
+                 {"project_id": project_id, "file": att.file_name, "category": category, "size": att.file_size})
     return ok({"id": att.id, "file_name": att.file_name}, message="上传成功")
 
 

@@ -37,6 +37,7 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
 @router.post("/logout")
 def logout(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     AuthService(db).logout(user["user_id"])
+    record_audit(db, user["user_id"], "logout", "user", str(user["user_id"]))
     return ok(message="已登出")
 
 
@@ -52,4 +53,5 @@ def change_password(body: ChangePasswordRequest, user: dict = Depends(get_curren
     from app.models.user import User
     u = db.get(User, user["user_id"])
     AuthService(db).change_password(u, body.old_password, body.new_password)
+    record_audit(db, user["user_id"], "update", "user", str(user["user_id"]), {"action": "change_password"})
     return ok(message="密码已修改，请重新登录")
