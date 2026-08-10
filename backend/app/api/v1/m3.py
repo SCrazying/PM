@@ -481,12 +481,21 @@ def recycle_bin(page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=100),
 @router.post("/admin/recycle-bin/restore")
 def recycle_restore(body: RecycleBatchIn, user: dict = Depends(require_admin), db: Session = Depends(get_db)):
     n = ProjectService(db).restore_projects(body.project_ids)
-    record_audit(db, user["user_id"], "restore", "project", ",".join(map(str, body.project_ids)), {"count": n})
+    # target_id 避免批量 join 超 64 字符：只存首尾标识，完整列表放 detail
+    ids = body.project_ids
+    tid = str(ids[0]) if ids else None
+    if len(ids) > 1:
+        tid = f"{ids[0]}..{ids[-1]}" if len(f"{ids[0]}..{ids[-1]}") <= 60 else f"{ids[0]}.."
+    record_audit(db, user["user_id"], "restore", "project", tid, {"count": n, "ids": ids})
     return ok(message=f"已恢复 {n} 个项目")
 
 
 @router.post("/admin/recycle-bin/purge")
 def recycle_purge(body: RecycleBatchIn, user: dict = Depends(require_admin), db: Session = Depends(get_db)):
     n = ProjectService(db).purge_projects(body.project_ids)
-    record_audit(db, user["user_id"], "purge", "project", ",".join(map(str, body.project_ids)), {"count": n})
+    ids = body.project_ids
+    tid = str(ids[0]) if ids else None
+    if len(ids) > 1:
+        tid = f"{ids[0]}..{ids[-1]}" if len(f"{ids[0]}..{ids[-1]}") <= 60 else f"{ids[0]}.."
+    record_audit(db, user["user_id"], "purge", "project", tid, {"count": n, "ids": ids})
     return ok(message=f"已彻底删除 {n} 个项目")

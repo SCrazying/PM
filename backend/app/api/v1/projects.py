@@ -190,6 +190,8 @@ def restore_project(project_id: int, user: dict = Depends(get_current_user), db:
     p = svc.get_project(project_id, include_deleted=True)
     svc.check_owner(p, user)
     svc.restore_projects([project_id])  # 含编号唯一校验与软删级联恢复
+    db.commit()  # 修复：restore_projects 不 commit，缺此步恢复会被 session 关闭时回滚
+    record_audit(db, user["user_id"], "restore", "project", str(project_id))
     return ok(message="已恢复")
 
 

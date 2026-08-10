@@ -291,12 +291,14 @@ def mark_read(nid: int, user: dict = Depends(get_current_user), db: Session = De
     if n and n.user_id == user["user_id"]:
         n.is_read = True
         db.commit()
+        record_audit(db, user["user_id"], "update", "notification", str(nid), {"is_read": True})
     return ok(message="已读")
 
 
 @router.post("/notifications/read-all")
 def mark_all_read(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     from app.models.misc import Notification
-    db.query(Notification).filter(Notification.user_id == user["user_id"], Notification.is_read.is_(False)).update({"is_read": True})
+    result = db.query(Notification).filter(Notification.user_id == user["user_id"], Notification.is_read.is_(False)).update({"is_read": True})
     db.commit()
+    record_audit(db, user["user_id"], "update", "notification", None, {"count": result})
     return ok(message="全部已读")

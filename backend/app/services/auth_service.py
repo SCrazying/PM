@@ -16,6 +16,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import AuthToken, User
+from app.services.audit_service import record_audit
 
 
 def _now() -> datetime:
@@ -40,10 +41,14 @@ class AuthService:
 
         if not verify_password(password, user.password_hash):
             user.failed_login_count += 1
+            locked = False
             if user.failed_login_count >= settings.LOGIN_MAX_FAIL:
                 user.locked_until = _now() + timedelta(minutes=settings.LOCK_MINUTES)
                 user.failed_login_count = 0
+                locked = True
             self.db.commit()
+            # 安全事件审计：登录失败 / 账号锁定
+            record_audit(self.db, user.id, "account_locked" if locked else "login_failed", "user", str(user.id))
             raise UnauthorizedError("用户名或密码错误")
 
         # 成功：重置计数、签发 token、持久化 refresh
