@@ -28,3 +28,23 @@ export function nextWeekStart() {
   m.setDate(m.getDate() + 7)
   return fmtDate(m)
 }
+
+// 周次下拉选项：前 past 周 ~ 未来 future 周（含本周），value=各周周一，label 含日期范围
+export function buildWeekOptions(past = 12, future = 12) {
+  const opts = []
+  for (let i = past; i >= 1; i--) {
+    const m = mondayOf(new Date())
+    m.setDate(m.getDate() - i * 7)
+    const e = new Date(m); e.setDate(e.getDate() + 6)
+    const s = fmtDate(m)
+    opts.push({ value: s, label: `${i === 1 ? '上周' : `前${i}周`} ${s.slice(5)}~${fmtDate(e).slice(5)}` })
+  }
+  for (let i = 0; i <= future; i++) {
+    const m = mondayOf(new Date())
+    m.setDate(m.getDate() + i * 7)
+    const e = new Date(m); e.setDate(e.getDate() + 6)
+    const s = fmtDate(m)
+    opts.push({ value: s, label: `${i === 0 ? '本周' : i === 1 ? '下周' : `${i + 1}周后`} ${s.slice(5)}~${fmtDate(e).slice(5)}` })
+  }
+  return opts
+}

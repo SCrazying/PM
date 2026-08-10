@@ -358,7 +358,7 @@ import {
 import { useUserStore } from '../store/user'
 import ProjectForm from '../components/ProjectForm.vue'
 import ProjectFiles from '../components/ProjectFiles.vue'
-import { fmtDate, mondayOf, thisWeekStart } from '../utils/date'
+import { buildWeekOptions, fmtDate, mondayOf, thisWeekStart } from '../utils/date'
 
 const route = useRoute()
 const store = useUserStore()
@@ -402,25 +402,7 @@ const goalForm = reactive({ id: null, goal: '', deadline: null, user_id: null, w
 const goalWeek = ref(thisWeekStart())
 const goalWeekStart = computed(() => goalWeek.value)
 // 周次下拉选项：前 12 周 ~ 未来 12 周（含本周），编辑时可下拉调整归属周次（修正填错的周）
-const weekOptions = ref([])
-function buildWeekOptions() {
-  const opts = []
-  // 前几周（过去）
-  for (let i = 12; i >= 1; i--) {
-    const m = mondayOf(new Date()); m.setDate(m.getDate() - i * 7)
-    const e = new Date(m); e.setDate(e.getDate() + 6)
-    const s = fmtDate(m)
-    opts.push({ value: s, label: `${i === 1 ? '上周' : `前${i}周`} ${s.slice(5)}~${fmtDate(e).slice(5)}` })
-  }
-  // 本周 + 未来
-  for (let i = 0; i <= 12; i++) {
-    const m = mondayOf(new Date()); m.setDate(m.getDate() + i * 7)
-    const e = new Date(m); e.setDate(e.getDate() + 6)
-    const s = fmtDate(m)
-    opts.push({ value: s, label: `${i === 0 ? '本周' : i === 1 ? '下周' : `${i + 1}周后`} ${s.slice(5)}~${fmtDate(e).slice(5)}` })
-  }
-  weekOptions.value = opts
-}
+const weekOptions = ref(buildWeekOptions())
 function ensureWeekOption(ws) {
   if (ws && !weekOptions.value.some((o) => o.value === ws)) {
     const m = mondayOf(ws); const e = new Date(m); e.setDate(e.getDate() + 6)
@@ -696,7 +678,7 @@ async function openProjectEdit() {
   if (project.value && editFormRef.value) await editFormRef.value.open(project.value)
 }
 
-onMounted(() => { buildWeekOptions(); loadAll() })
+onMounted(loadAll)
 </script>
 
 <style scoped>

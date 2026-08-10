@@ -4,8 +4,9 @@
       <div class="pm-toolbar weekly-toolbar" style="margin-bottom:0">
         <div class="tb-left">
           <span class="pm-page-title">周会视图</span>
-          <el-date-picker v-model="weekStart" type="week" format="YYYY 第 ww 周" value-format="YYYY-MM-DD"
-                          :first-day-of-week="1" style="width: 180px" @change="load" />
+          <el-select v-model="weekStart" filterable style="width: 190px" @change="load">
+            <el-option v-for="w in weekOptions" :key="w.value" :label="w.label" :value="w.value" />
+          </el-select>
           <el-select v-model="filterMachine" clearable filterable placeholder="按机型筛选" style="width: 150px">
             <el-option v-for="m in machineOptions" :key="m" :label="m" :value="m" />
           </el-select>
@@ -260,13 +261,15 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { groupWeekly, projectWeekly, listProjects, listUserOptions, exportLedger, setSubnodeStatus, setProgressRiskResolved, setWeeklyGoalItemDone } from '../api'
-import { fmtDate, mondayOf, todayStr } from '../utils/date'
+import { buildWeekOptions, fmtDate, mondayOf, todayStr } from '../utils/date'
 import { ElMessage } from 'element-plus'
 import { useViewFilterStore } from '../store/filters'
 
 const router = useRouter()
 const viewFilters = useViewFilterStore()
-// weekStart 强制规整到周一：无论 date-picker 返回周日/周一，都与项目详情/后端周一口径一致
+// 周次下拉选项（前12~未来12周，value 一律周一，避免 date-picker 周首歧义错位）
+const weekOptions = buildWeekOptions()
+// weekStart 强制规整到周一，与项目详情/后端周一口径一致
 const weekStart = computed({
   get: () => viewFilters.weekly.weekStart,
   set: (v) => { viewFilters.weekly.weekStart = v ? fmtDate(mondayOf(v)) : v },
