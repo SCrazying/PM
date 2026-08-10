@@ -460,7 +460,14 @@ def export_audit_logs(actor: str | None = None, action: str | None = None, targe
         q = q.where(AuditLog.created_at >= datetime.combine(date_from, time.min))
     if date_to:
         q = q.where(AuditLog.created_at < datetime.combine(date_to + timedelta(days=1), time.min))
-    rows = db.execute(q.order_by(AuditLog.id.desc())).all()
+    # 导出上限保护：避免日志量巨大时一次拉全量 OOM（如需全部可缩小日期范围分批导出）
+    rows = db.execute(q.order_by(AuditLog.id.desc()).limit(50000)).all()
+
+    def _csv_safe(v):
+        """CSV 注入防护：以 = + - @ 开头的单元格加 ' 前缀，防 Excel 当公式执行。"""
+        s = str(v) if v is not None else ""
+        return ("'" + s) if s and s[0] in "=+-@" else s
+
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["时间", "操作者", "动作", "对象类型", "对象ID", "IP", "详情"])
@@ -468,8 +475,8 @@ def export_audit_logs(actor: str | None = None, action: str | None = None, targe
         detail = json.dumps(log.detail, ensure_ascii=False) if log.detail else ""
         w.writerow([
             log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else "",
-            uname or "", log.action or "", log.target_type or "", log.target_id or "",
-            log.ip or "", detail,
+            _csv_safe(uname), _csv_safe(log.action), _csv_safe(log.target_type), _csv_safe(log.target_id),
+            _csv_safe(log.ip), _csv_safe(detail),
         ])
     return StreamingResponse(
         iter([buf.getvalue().encode("utf-8-sig")]),

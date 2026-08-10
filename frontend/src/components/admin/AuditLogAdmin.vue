@@ -77,7 +77,13 @@ const actionText = (a) => actionMap[a] || a
 const targetText = (t) => targetMap[t] || t
 const actionTag = (a) => ({ create: 'success', update: 'primary', delete: 'danger', review: 'warning' }[a] || 'info')
 
-function fmtTime(t) { return t ? t.replace('T', ' ').slice(0, 19) : '—' }
+function fmtTime(t) {
+  if (!t) return '—'
+  const d = new Date(t)
+  if (isNaN(d.getTime())) return t.replace('T', ' ').slice(0, 19)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
 function detailText(d) {
   // detail 可能是 {field: {before, after}} 或 {key: value}，转成可读文本
   const parts = Object.entries(d).map(([k, v]) => {

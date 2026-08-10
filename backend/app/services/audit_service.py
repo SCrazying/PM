@@ -59,13 +59,21 @@ def model_to_dict(obj: Any, fields: list[str]) -> dict:
 
 
 def cleanup_expired(db: Session, days: Optional[int] = None) -> int:
-    """清理过期审计日志（默认按 config audit.retention_months，按月*30天）。返回删除条数。"""
+    """清理过期审计日志（默认按 config audit.retention_months，按月*30天）。返回删除条数。
+    分批删除（每批 5000），避免单条大 DELETE 长锁表/膨胀。"""
     if days is None:
         from app.models.misc import Config
         row = db.get(Config, "audit.retention_months")
         months = int(row.value) if row and row.value and str(row.value).isdigit() else 24
         days = months * 30
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    result = db.query(AuditLog).filter(AuditLog.created_at < cutoff).delete(synchronize_session=False)
-    db.commit()
-    return result
+    total = 0
+    while True:
+        batch = db.query(AuditLog.id).filter(AuditLog.created_at < cutoff).limit(5000).all()
+        if not batch:
+            break
+        ids = [b[0] for b in batch]
+        db.query(AuditLog).filter(AuditLog.id.in_(ids)).delete(synchronize_session=False)
+        db.commit()
+        total += len(ids)
+    return total
