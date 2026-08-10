@@ -128,11 +128,9 @@
         <div class="pm-card">
           <div class="pm-flex-between" style="margin-bottom:8px">
             <span class="card-title">周目标
-              <el-radio-group v-model="goalWeek" size="small" style="margin-left:8px; vertical-align: middle" @change="loadGoal">
-                <el-radio-button value="this">本周</el-radio-button>
-                <el-radio-button value="next">下周</el-radio-button>
-              </el-radio-group>
-              <span class="pm-sub" style="margin-left:6px; font-size:12px">{{ goalWeekRange }}</span>
+              <el-select v-model="goalWeek" filterable size="small" style="width:190px; margin-left:8px; vertical-align: middle" @change="loadGoal">
+                <el-option v-for="w in weekOptions" :key="w.value" :label="w.label" :value="w.value" />
+              </el-select>
               <el-tag v-if="goalItems.length && goalItems.filter(g=>g.done).length===goalItems.length" size="small" type="success" style="margin-left:6px">全部完成</el-tag>
             </span>
             <el-button size="small" link type="primary" @click="openGoalItem()" v-if="canEdit">+ 添加</el-button>
@@ -153,7 +151,7 @@
             </div>
           </div>
           <div v-else-if="legacyGoal" class="goal-cell">{{ legacyGoal }}</div>
-          <div v-else class="empty">未设定{{ goalWeek === 'next' ? '下周' : '本周' }}目标</div>
+          <div v-else class="empty">该周未设定目标</div>
         </div>
 
         <div class="pm-card" style="margin-top:14px">
@@ -360,7 +358,7 @@ import {
 import { useUserStore } from '../store/user'
 import ProjectForm from '../components/ProjectForm.vue'
 import ProjectFiles from '../components/ProjectFiles.vue'
-import { fmtDate, mondayOf, nextWeekStart, thisWeekStart } from '../utils/date'
+import { fmtDate, mondayOf, thisWeekStart } from '../utils/date'
 
 const route = useRoute()
 const store = useUserStore()
@@ -400,9 +398,9 @@ const reviewVisible = ref(false)
 const reviewForm = reactive({ conclusion: 'pass', comment: '' })
 const goalVisible = ref(false)
 const goalForm = reactive({ id: null, goal: '', deadline: null, user_id: null, weekStart: null })
-// 周目标归属周切换（本周/下周）：本周有目标即可提前写下周目标（周五更新下周）
-const goalWeek = ref('this')
-const goalWeekStart = computed(() => (goalWeek.value === 'next' ? nextWeekStart() : thisWeekStart()))
+// 周目标查看周（选中的周一；默认本周，可下拉查看前/后任意周并编辑）
+const goalWeek = ref(thisWeekStart())
+const goalWeekStart = computed(() => goalWeek.value)
 // 周次下拉选项：前 12 周 ~ 未来 12 周（含本周），编辑时可下拉调整归属周次（修正填错的周）
 const weekOptions = ref([])
 function buildWeekOptions() {
@@ -429,12 +427,6 @@ function ensureWeekOption(ws) {
     weekOptions.value.push({ value: fmtDate(m), label: `${fmtDate(m).slice(5)}~${fmtDate(e).slice(5)}` })
   }
 }
-// 显示周次范围（如 08-10 ~ 08-16），避免"本周/下周"归属混淆
-const goalWeekRange = computed(() => {
-  const s = new Date(goalWeekStart.value)
-  const e = new Date(s); e.setDate(e.getDate() + 6)
-  return `${goalWeekStart.value.slice(5)} ~ ${fmtDate(e).slice(5)}`
-})
 const editFormRef = ref()
 
 const ownerName = computed(() => userName(project.value?.owner_id))
