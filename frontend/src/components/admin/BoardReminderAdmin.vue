@@ -24,13 +24,18 @@ const exemptIds = ref([])
 const saving = ref(false)
 
 async function load() {
-  users.value = await listUserOptions()
-  const rows = await listConfig()
-  const row = rows.find((r) => r.key === CONFIG_KEY)
+async function load() {
   try {
-    exemptIds.value = row && row.value ? JSON.parse(row.value) : []
-  } catch {
-    exemptIds.value = []
+    users.value = await listUserOptions()
+    const rows = await listConfig()
+    const row = rows.find((r) => r.key === CONFIG_KEY)
+    try {
+      exemptIds.value = row && row.value ? JSON.parse(row.value) : []
+    } catch {
+      exemptIds.value = []
+    }
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '加载配置失败')
   }
 }
 
@@ -39,6 +44,8 @@ async function save() {
   try {
     await setConfig(CONFIG_KEY, JSON.stringify(exemptIds.value))
     ElMessage.success('已保存看板报工提醒排除配置')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '保存失败')
   } finally {
     saving.value = false
   }

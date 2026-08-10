@@ -84,6 +84,8 @@ async function onUpload() {
     picked.value = null
     if (fileInput.value) fileInput.value.value = ''
     load()
+  } catch (e) {
+    ElMessage.error(errMsg(e, '上传失败'))
   } finally {
     uploading.value = false
   }
@@ -97,10 +99,22 @@ function onDownload(f) {
 }
 
 async function onDelete(f) {
-  await ElMessageBox.confirm(`确认删除资料「${f.file_name}」？`, '删除确认', { type: 'warning', confirmButtonText: '删除' })
-  await deleteAttachment(f.id)
-  ElMessage.success('已删除')
-  load()
+  try {
+    await ElMessageBox.confirm(`确认删除资料「${f.file_name}」？`, '删除确认', { type: 'warning', confirmButtonText: '删除' })
+  } catch {
+    return  // 取消
+  }
+  try {
+    await deleteAttachment(f.id)
+    ElMessage.success('已删除')
+    load()
+  } catch (e) {
+    ElMessage.error(errMsg(e, '删除失败'))
+  }
+}
+
+function errMsg(e, fallback) {
+  return e?.response?.data?.message || fallback
 }
 
 onMounted(load)
