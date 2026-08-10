@@ -1,5 +1,7 @@
 """M3 路由：个人汇总/AI 总结、附件、配置、TR 模板管理、备份、导出。"""
+import csv
 import glob
+import io
 import json
 import os
 import shutil
@@ -8,7 +10,7 @@ import sys
 from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, Query, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -430,6 +432,42 @@ def audit_meta(user: dict = Depends(require_admin), db: Session = Depends(get_db
     actions = [r[0] for r in db.execute(select(AuditLog.action).distinct()).all()]
     target_types = [r[0] for r in db.execute(select(AuditLog.target_type).distinct()).all()]
     return ok({"actions": actions, "target_types": [t for t in target_types if t]})
+
+
+@router.get("/admin/audit-logs/export")
+def export_audit_logs(actor: str | None = None, action: str | None = None, target_type: str | None = None,
+                      target_id: str | None = None, date_from: date | None = None, date_to: date | None = None,
+                      user: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    """操作日志导出 CSV（按当前过滤条件全量）。"""
+    q = select(AuditLog, User.display_name).join(User, User.id == AuditLog.actor_id, isouter=True)
+    if actor:
+        q = q.where(or_(User.display_name.ilike(f"%{actor}%"), User.username.ilike(f"%{actor}%")))
+    if action:
+        q = q.where(AuditLog.action == action)
+    if target_type:
+        q = q.where(AuditLog.target_type == target_type)
+    if target_id:
+        q = q.where(AuditLog.target_id == target_id)
+    if date_from:
+        q = q.where(AuditLog.created_at >= datetime.combine(date_from, time.min))
+    if date_to:
+        q = q.where(AuditLog.created_at < datetime.combine(date_to + timedelta(days=1), time.min))
+    rows = db.execute(q.order_by(AuditLog.id.desc())).all()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["时间", "操作者", "动作", "对象类型", "对象ID", "IP", "详情"])
+    for log, uname in rows:
+        detail = json.dumps(log.detail, ensure_ascii=False) if log.detail else ""
+        w.writerow([
+            log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else "",
+            uname or "", log.action or "", log.target_type or "", log.target_id or "",
+            log.ip or "", detail,
+        ])
+    return StreamingResponse(
+        iter([buf.getvalue().encode("utf-8-sig")]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=audit_logs.csv"},
+    )
 
 
 # ---------- 回收站（假删除项目：恢复 / 彻底删除）----------

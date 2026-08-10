@@ -11,9 +11,11 @@
       <el-select v-model="query.target_type" placeholder="对象类型" clearable style="width:140px">
         <el-option v-for="t in meta.target_types" :key="t" :label="targetText(t)" :value="t" />
       </el-select>
+      <el-input v-model="query.target_id" placeholder="对象ID(如项目号)" clearable style="width:150px" @keyup.enter="load(1)" />
       <el-date-picker v-model="dateRange" type="daterange" value-format="YYYY-MM-DD" start-placeholder="开始" end-placeholder="结束" style="width:240px" />
       <el-button type="primary" @click="load(1)">查询</el-button>
       <el-button @click="onReset">重置</el-button>
+      <el-button type="success" plain :loading="exporting" @click="exportCsv">导出</el-button>
     </div>
     <el-table :data="rows" v-loading="loading" border stripe size="small">
       <el-table-column label="时间" width="170">
@@ -30,9 +32,11 @@
       <el-table-column label="对象" width="130">
         <template #default="{ row }">{{ targetText(row.target_type) }}{{ row.target_id ? ` #${row.target_id}` : '' }}</template>
       </el-table-column>
-      <el-table-column label="详情" min-width="260">
+      <el-table-column label="详情" min-width="280">
         <template #default="{ row }">
-          <div v-if="row.detail && Object.keys(row.detail).length" class="detail-cell">{{ detailText(row.detail) }}</div>
+          <el-tooltip v-if="row.detail && Object.keys(row.detail).length" :content="JSON.stringify(row.detail, null, 2)" placement="top" :show-after="300">
+            <div class="detail-cell">{{ detailText(row.detail) }}</div>
+          </el-tooltip>
           <span v-else class="pm-sub">—</span>
         </template>
       </el-table-column>
@@ -45,9 +49,10 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getAuditMeta, listAuditLogs } from '../../api'
+import { exportAuditLogs, getAuditMeta, listAuditLogs } from '../../api'
 
 const loading = ref(false)
+const exporting = ref(false)
 const rows = ref([])
 const total = ref(0)
 const meta = reactive({ actions: [], target_types: [] })
@@ -96,6 +101,24 @@ function onReset() {
   Object.assign(query, { actor: '', action: '', target_type: '', target_id: '', page: 1, size: 20 })
   dateRange.value = null
   load(1)
+}
+
+async function exportCsv() {
+  exporting.value = true
+  try {
+    const params = { ...query, date_from: dateRange.value?.[0], date_to: dateRange.value?.[1] }
+    const blob = await exportAuditLogs(params)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = '操作日志.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '导出失败')
+  } finally {
+    exporting.value = false
+  }
 }
 
 onMounted(async () => {
