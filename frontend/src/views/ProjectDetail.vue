@@ -128,9 +128,8 @@
         <div class="pm-card">
           <div class="pm-flex-between" style="margin-bottom:8px">
             <span class="card-title">周目标
-              <el-select v-model="goalWeek" filterable size="small" style="width:190px; margin-left:8px; vertical-align: middle" @change="loadGoal">
-                <el-option v-for="w in weekOptions" :key="w.value" :label="w.label" :value="w.value" />
-              </el-select>
+              <el-date-picker v-model="goalWeek" type="week" format="YYYY 第 ww 周" value-format="YYYY-MM-DD"
+                              :first-day-of-week="1" style="width:165px; margin-left:8px; vertical-align: middle" @change="loadGoal" />
               <el-tag v-if="goalItems.length && goalItems.filter(g=>g.done).length===goalItems.length" size="small" type="success" style="margin-left:6px">全部完成</el-tag>
             </span>
             <el-button size="small" link type="primary" @click="openGoalItem()" v-if="canEdit">+ 添加</el-button>
@@ -398,8 +397,12 @@ const reviewVisible = ref(false)
 const reviewForm = reactive({ conclusion: 'pass', comment: '' })
 const goalVisible = ref(false)
 const goalForm = reactive({ id: null, goal: '', deadline: null, user_id: null, weekStart: null })
-// 周目标查看周（选中的周一；默认本周，可下拉查看前/后任意周并编辑）
-const goalWeek = ref(thisWeekStart())
+// 周目标查看周（date-picker 日历选周；value 规整到周一，与后端周一口径一致）
+const goalWeekRaw = ref(thisWeekStart())
+const goalWeek = computed({
+  get: () => goalWeekRaw.value,
+  set: (v) => { goalWeekRaw.value = v ? fmtDate(mondayOf(v)) : v },
+})
 const goalWeekStart = computed(() => goalWeek.value)
 // 周次下拉选项：前 12 周 ~ 未来 12 周（含本周），编辑时可下拉调整归属周次（修正填错的周）
 const weekOptions = ref(buildWeekOptions())
