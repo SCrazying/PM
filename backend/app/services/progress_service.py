@@ -13,6 +13,14 @@ from app.schemas.progress import ProgressCreate, ProgressUpdate
 from app.services.project_service import ProjectService
 
 
+def _coerce_date(v):
+    """把前端传来的 'YYYY-MM-DD' 字符串规整为 date；空串/None 置 None，防 Date 列插入崩溃。"""
+    if isinstance(v, str):
+        v = v.strip()
+        return date.fromisoformat(v) if v else None
+    return v
+
+
 class ProgressService:
     def __init__(self, db: Session):
         self.db = db
@@ -277,7 +285,8 @@ class ProgressService:
             select(func.count()).select_from(WeeklyGoalItem).where(
                 WeeklyGoalItem.project_id == project_id, WeeklyGoalItem.week_start == ws)
         ).scalar_one() + 1
-        item = WeeklyGoalItem(project_id=project_id, week_start=ws, goal=goal, deadline=deadline,
+        item = WeeklyGoalItem(project_id=project_id, week_start=ws, goal=goal,
+                              deadline=_coerce_date(deadline),
                               user_id=user_id, sequence=seq)
         self.db.add(item)
         self.db.commit()
@@ -292,7 +301,7 @@ class ProgressService:
         self.ps.check_owner(project, user)
         if goal is not None:
             item.goal = goal
-        item.deadline = deadline
+        item.deadline = _coerce_date(deadline)
         if user_id:
             member = self.db.execute(
                 select(ProjectMember).where(

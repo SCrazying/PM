@@ -118,21 +118,22 @@ class BoardService:
             if pr.tomorrow_plan and pr.tomorrow_plan.strip():
                 filled_plan.add(pr.author_id)
 
-        uid_list = list(user_projects)
-        name_map = {}
-        if uid_list:
-            name_map = {u.id: u.display_name for u in self.db.execute(
-                select(User).where(User.id.in_(uid_list))).scalars().all()}
-
         # 报工提醒排除人员（系统管理可配置：部分同事不参与早会点名，看板缺报面板不提示）
         exempt_cfg = self.db.get(Config, "board.report_exempt_users")
         exempt_ids = set()
         if exempt_cfg and exempt_cfg.value:
             try:
-                exempt_ids = {int(x) for x in json.loads(exempt_cfg.value) if isinstance(x, int) or str(x).isdigit()}
+                exempt_ids = {int(x) for x in json.loads(exempt_cfg.value)
+                              if (isinstance(x, int) and not isinstance(x, bool)) or str(x).isdigit()}
             except (ValueError, TypeError):
                 exempt_ids = set()
         user_projects = {uid: projs for uid, projs in user_projects.items() if uid not in exempt_ids}
+
+        uid_list = list(user_projects)
+        name_map = {}
+        if uid_list:
+            name_map = {u.id: u.display_name for u in self.db.execute(
+                select(User).where(User.id.in_(uid_list))).scalars().all()}
 
         def _mk(uid, projs):
             return {"user_id": uid, "display_name": name_map.get(uid), "projects": [
