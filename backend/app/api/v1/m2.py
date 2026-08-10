@@ -60,6 +60,13 @@ def my_todo(user: dict = Depends(get_current_user), db: Session = Depends(get_db
     return ok(ProgressService(db).my_todo(user))
 
 
+@router.get("/progress/mine/month")
+def my_progress_month(year: int = Query(...), month: int = Query(..., ge=1, le=12),
+                      user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """工作台月度视图：某月我的进展（按日期分组）。"""
+    return ok(ProgressService(db).my_progress_by_month(user["user_id"], year, month))
+
+
 # ---------- 周目标 ----------
 @router.get("/projects/{project_id}/weekly-goal")
 def get_weekly_goal(project_id: int, week_start: date = Query(...), user: dict = Depends(get_current_user), db: Session = Depends(get_db)):

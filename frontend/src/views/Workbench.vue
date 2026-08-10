@@ -43,29 +43,46 @@
         </div>
 
         <div class="pm-card" style="margin-top:16px">
-          <div class="pm-flex-between" style="margin-bottom:12px">
-            <span class="card-title">最近进展</span>
-            <el-tag size="small" type="info">{{ todo.recent_progress.length }}</el-tag>
-          </div>
-          <div v-if="!todo.recent_progress.length" class="empty">暂无进展记录</div>
-          <div v-for="p in todo.recent_progress" :key="p.id" class="recent-progress">
-            <div class="recent-head">
-              <div>
-                <b>{{ p.project_name }}</b>
-                <span class="pm-sub"> · {{ p.progress_date }}</span>
-              </div>
-              <el-button link type="primary" size="small" @click="openRecentEdit(p)">编辑</el-button>
+          <div class="pm-flex-between" style="margin-bottom:8px">
+            <span class="card-title">我的进展</span>
+            <div class="pm-flex pm-gap">
+              <el-button size="small" @click="changeMonth(-1)">上月</el-button>
+              <span class="month-label">{{ monthLabel }}</span>
+              <el-button size="small" @click="changeMonth(1)">下月</el-button>
+              <el-button size="small" type="primary" plain @click="backToday">本月</el-button>
             </div>
-            <div class="recent-node pm-sub">{{ p.node_name || '项目级进展' }}</div>
-            <div class="recent-work">{{ p.today_work }}</div>
-            <div v-if="p.risk" class="risk">⚠ {{ p.risk }}</div>
           </div>
+          <el-calendar v-model="calDate">
+            <template #date-cell="{ data }">
+              <div class="cal-cell" :class="{ has: hasProgress(data.day) }">
+                <div class="cal-day">{{ Number(data.day.split('-')[2]) }}</div>
+                <div v-if="hasProgress(data.day)" class="cal-dots"><span class="cal-dot"></span></div>
+              </div>
+            </template>
+          </el-calendar>
+          <div v-if="selectedDayProgress.length" class="day-progress" style="margin-top:10px">
+            <div class="sec-h">当日报工（{{ selectedDayProgress.length }} 条）</div>
+            <div v-for="p in selectedDayProgress" :key="p.id" class="recent-progress">
+              <div class="recent-head">
+                <div><b>{{ p.project_name }}</b><span class="pm-sub"> · {{ p.progress_date }}</span></div>
+                <el-button link type="primary" size="small" @click="openRecentEdit(p)">编辑</el-button>
+              </div>
+              <div class="recent-node pm-sub">{{ p.node_name || '项目级进展' }}</div>
+              <div class="recent-work">{{ p.today_work }}</div>
+              <div v-if="p.tomorrow_plan" class="pm-sub plan-line">明日：{{ p.tomorrow_plan }}</div>
+              <div v-if="p.risk" class="risk">⚠ {{ p.risk }}</div>
+            </div>
+          </div>
+          <div v-else class="empty">点击日历日期查看该天报工</div>
         </div>
       </el-col>
 
       <el-col :span="14">
         <div class="pm-card" v-if="fillProject">
-          <div class="card-title" style="margin-bottom:14px">填报进展 · {{ fillProject.name }}</div>
+          <div class="card-title" style="margin-bottom:14px">
+            {{ fillForm._editId ? '修改进展' : '填报进展' }} · {{ fillProject.name }}
+            <el-tag v-if="fillForm._editId" size="small" type="success" style="margin-left:6px">已填报（直接修改）</el-tag>
+          </div>
           <el-form label-width="80px">
             <el-form-item label="日期">
               <el-date-picker v-model="fillForm.progress_date" type="date" value-format="YYYY-MM-DD" style="width:160px" />
@@ -76,13 +93,13 @@
               </el-select>
             </el-form-item>
             <el-form-item label="今日进展" required>
-              <el-input v-model="fillForm.today_work" type="textarea" :rows="3" placeholder="今天做了什么" />
+              <el-input v-model="fillForm.today_work" type="textarea" :rows="4" placeholder="今天做了什么" />
             </el-form-item>
             <el-form-item label="明日计划">
-              <el-input v-model="fillForm.tomorrow_plan" type="textarea" :rows="2" placeholder="明天计划做什么" />
+              <el-input v-model="fillForm.tomorrow_plan" type="textarea" :rows="3" placeholder="明天计划做什么" />
             </el-form-item>
             <el-form-item label="风险问题">
-              <el-input v-model="fillForm.risk" type="textarea" :rows="2" placeholder="遇到的风险/阻塞（可选）" />
+              <el-input v-model="fillForm.risk" type="textarea" :rows="3" placeholder="遇到的风险/阻塞（可选）" />
             </el-form-item>
             <el-form-item label="关联任务">
               <el-select v-model="fillForm.task_ids" multiple clearable placeholder="选择相关任务" style="width:100%">
@@ -90,7 +107,7 @@
               </el-select>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" :loading="saving" @click="submitFill">提交进展</el-button>
+              <el-button type="primary" :loading="saving" @click="submitFill">{{ fillForm._editId ? '保存修改' : '提交进展' }}</el-button>
               <el-button @click="fillProject = null">取消</el-button>
             </el-form-item>
           </el-form>
@@ -109,10 +126,10 @@
         <el-form-item label="日期"><span>{{ progressEditForm.progress_date }}</span></el-form-item>
         <el-form-item label="所属节点"><span>{{ progressEditForm.node_name || '项目级' }}</span></el-form-item>
         <el-form-item label="今日进展" required>
-          <el-input v-model="progressEditForm.today_work" type="textarea" :rows="3" />
+          <el-input v-model="progressEditForm.today_work" type="textarea" :rows="4" />
         </el-form-item>
-        <el-form-item label="明日计划"><el-input v-model="progressEditForm.tomorrow_plan" type="textarea" :rows="2" /></el-form-item>
-        <el-form-item label="风险问题"><el-input v-model="progressEditForm.risk" type="textarea" :rows="2" /></el-form-item>
+        <el-form-item label="明日计划"><el-input v-model="progressEditForm.tomorrow_plan" type="textarea" :rows="3" /></el-form-item>
+        <el-form-item label="风险问题"><el-input v-model="progressEditForm.risk" type="textarea" :rows="3" /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="progressEditVisible = false">取消</el-button>
@@ -125,8 +142,8 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { createProgress, listNodes, listTasks, myTodo, updateProgress } from '../api'
-import { todayStr } from '../utils/date'
+import { createProgress, listNodes, listProgress, listTasks, myProgressByMonth, myTodo, updateProgress } from '../api'
+import { fmtDate, todayStr } from '../utils/date'
 
 const today = todayStr()
 const todo = reactive({ projects: [], tasks: [], recent_progress: [] })
@@ -136,8 +153,23 @@ const projTasks = ref([])
 const saving = ref(false)
 const progressEditVisible = ref(false)
 const progressSaving = ref(false)
-const fillForm = reactive({ progress_date: today, project_node_id: null, today_work: '', tomorrow_plan: '', risk: '', task_ids: [] })
+const fillForm = reactive({ progress_date: today, project_node_id: null, today_work: '', tomorrow_plan: '', risk: '', task_ids: [], _editId: null })
 const progressEditForm = reactive({ id: null, progress_date: '', node_name: '', today_work: '', tomorrow_plan: '', risk: '' })
+
+// 月度视图：我的进展日历
+const calDate = ref(new Date())
+const monthProgress = ref({})
+const monthLabel = computed(() => `${calDate.value.getFullYear()} 年 ${calDate.value.getMonth() + 1} 月`)
+const dayKey = (d) => fmtDate(d)
+const hasProgress = (day) => !!(monthProgress.value[day] && monthProgress.value[day].length)
+const selectedDayProgress = computed(() => monthProgress.value[dayKey(calDate.value)] || [])
+async function loadMonth() {
+  const y = calDate.value.getFullYear()
+  const m = calDate.value.getMonth() + 1
+  monthProgress.value = await myProgressByMonth(y, m).catch(() => ({}))
+}
+function changeMonth(delta) { calDate.value = new Date(calDate.value.getFullYear(), calDate.value.getMonth() + delta, 1); loadMonth() }
+function backToday() { calDate.value = new Date(); loadMonth() }
 
 const filledCount = computed(() => todo.projects.filter((p) => p.filled_today).length)
 
@@ -150,9 +182,23 @@ async function load() {
 
 async function openFill(p) {
   fillProject.value = p
-  Object.assign(fillForm, { progress_date: today, project_node_id: p.current_node_id || null, today_work: '', tomorrow_plan: '', risk: '', task_ids: [] })
   nodes.value = await listNodes(p.id)
   projTasks.value = await listTasks(p.id, {})
+  // 今日已填报：加载已有进展到右侧直接修改
+  if (p.filled_today) {
+    const list = await listProgress(p.id, { date_from: today, date_to: today }).catch(() => [])
+    const cur = list[0]
+    if (cur) {
+      Object.assign(fillForm, {
+        progress_date: today,
+        project_node_id: cur.project_node_id ?? (p.current_node_id || null),
+        today_work: cur.today_work || '', tomorrow_plan: cur.tomorrow_plan || '', risk: cur.risk || '',
+        task_ids: [], _editId: cur.id,
+      })
+      return
+    }
+  }
+  Object.assign(fillForm, { progress_date: today, project_node_id: p.current_node_id || null, today_work: '', tomorrow_plan: '', risk: '', task_ids: [], _editId: null })
 }
 
 async function submitFill() {
@@ -162,10 +208,18 @@ async function submitFill() {
   }
   saving.value = true
   try {
-    await createProgress(fillProject.value.id, fillForm)
-    ElMessage.success('已提交')
+    if (fillForm._editId) {
+      await updateProgress(fillForm._editId, {
+        today_work: fillForm.today_work, tomorrow_plan: fillForm.tomorrow_plan, risk: fillForm.risk,
+      })
+      ElMessage.success('已保存修改')
+    } else {
+      await createProgress(fillProject.value.id, fillForm)
+      ElMessage.success('已提交')
+    }
     fillProject.value = null
     await load()
+    loadMonth()
   } finally {
     saving.value = false
   }
@@ -203,12 +257,23 @@ async function saveRecentEdit() {
   }
 }
 
-onMounted(load)
+onMounted(() => { load(); loadMonth() })
 </script>
 
 <style scoped>
 .card-title { font-weight: 700; font-size: 15px; }
 .empty { color: var(--pm-text-3); text-align: center; padding: 24px 0; font-size: 13px; }
+.month-label { font-weight: 600; font-size: 14px; }
+.sec-h { font-weight: 700; font-size: 13px; margin-bottom: 6px; color: var(--pm-text-2); }
+.plan-line { margin-top: 3px; }
+.cal-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
+.cal-cell.has { cursor: pointer; }
+.cal-day { font-size: 13px; }
+.cal-cell.has .cal-day { font-weight: 700; color: var(--pm-primary); }
+.cal-dots { display: flex; margin-top: 2px; }
+.cal-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pm-primary); }
+.el-calendar .el-calendar-table .el-calendar-day { height: 46px; padding: 2px; }
+.day-progress { max-height: 280px; overflow-y: auto; }
 .todo-proj {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 11px 12px; border-radius: 10px; cursor: pointer;

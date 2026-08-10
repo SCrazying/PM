@@ -213,6 +213,30 @@ class ProgressService:
         } for p, project_name, project_code, node_name in recent_rows]
         return {"date": today, "projects": projects, "tasks": my_tasks, "recent_progress": recent_progress}
 
+    def my_progress_by_month(self, user_id: int, year: int, month: int) -> dict:
+        """某月我的全部进展（按日期分组），供工作台月度视图选天查看/编辑。"""
+        start = date(year, month, 1)
+        end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+        rows = self.db.execute(
+            select(Progress, Project.name, ProjectNode.name)
+            .join(Project, Project.id == Progress.project_id)
+            .outerjoin(ProjectNode, ProjectNode.id == Progress.project_node_id)
+            .where(
+                Progress.author_id == user_id,
+                Progress.is_deleted.is_(False),
+                Project.is_deleted.is_(False),
+                Progress.progress_date >= start, Progress.progress_date < end,
+            ).order_by(Progress.progress_date, Progress.id)
+        ).all()
+        grouped: dict[str, list] = {}
+        for p, pname, node_name in rows:
+            grouped.setdefault(p.progress_date.isoformat(), []).append({
+                "id": p.id, "project_id": p.project_id, "project_name": pname,
+                "progress_date": p.progress_date, "project_node_id": p.project_node_id, "node_name": node_name,
+                "today_work": p.today_work, "tomorrow_plan": p.tomorrow_plan, "risk": p.risk,
+            })
+        return grouped
+
     # ---------- 周目标 ----------
     def get_weekly_goal(self, project_id: int, week_start: date) -> Optional[ProjectWeeklyGoal]:
         self.ps.get_project(project_id)
