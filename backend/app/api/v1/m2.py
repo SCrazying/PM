@@ -95,7 +95,7 @@ def add_weekly_goal_item(project_id: int, body: dict, user: dict = Depends(get_c
 @router.patch("/weekly-goal-items/{item_id}")
 def update_weekly_goal_item(item_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     item = ProgressService(db).update_weekly_goal_item(
-        item_id, body.get("goal"), body.get("deadline"), body.get("user_id"), user)
+        item_id, body.get("goal"), body.get("deadline"), body.get("user_id"), body.get("week_start"), user)
     return ok({"id": item.id}, message="已更新")
 
 

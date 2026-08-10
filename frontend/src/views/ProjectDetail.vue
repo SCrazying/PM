@@ -285,11 +285,10 @@
           <el-input v-model="goalForm.goal" type="textarea" :rows="2" placeholder="本周目标条目" />
         </el-form-item>
         <el-form-item label="归属周次">
-          <el-radio-group v-model="goalForm.week" :disabled="!!goalForm.id">
-            <el-radio-button value="this">本周</el-radio-button>
-            <el-radio-button value="next">下周</el-radio-button>
-          </el-radio-group>
-          <span v-if="goalForm.id" class="pm-sub" style="margin-left:8px">编辑不改变目标所在周</span>
+          <el-select v-model="goalForm.weekStart" style="width:100%">
+            <el-option v-for="w in weekOptions" :key="w.value" :label="w.label" :value="w.value" />
+          </el-select>
+          <span class="pm-sub" style="margin-top:4px">可调整目标所在周（修正填错的周次）</span>
         </el-form-item>
         <el-form-item label="负责人">
           <el-select v-model="goalForm.user_id" clearable filterable placeholder="选择项目成员（可不选）" style="width:100%">
@@ -361,7 +360,7 @@ import {
 import { useUserStore } from '../store/user'
 import ProjectForm from '../components/ProjectForm.vue'
 import ProjectFiles from '../components/ProjectFiles.vue'
-import { fmtDate, nextWeekStart, thisWeekStart } from '../utils/date'
+import { fmtDate, mondayOf, nextWeekStart, thisWeekStart } from '../utils/date'
 
 const route = useRoute()
 const store = useUserStore()
@@ -400,10 +399,28 @@ const memberForm = reactive({ user_id: null, project_role: '', is_invested: true
 const reviewVisible = ref(false)
 const reviewForm = reactive({ conclusion: 'pass', comment: '' })
 const goalVisible = ref(false)
-const goalForm = reactive({ id: null, goal: '', deadline: null, user_id: null, week: 'this' })
+const goalForm = reactive({ id: null, goal: '', deadline: null, user_id: null, weekStart: null })
 // 周目标归属周切换（本周/下周）：本周有目标即可提前写下周目标（周五更新下周）
 const goalWeek = ref('this')
 const goalWeekStart = computed(() => (goalWeek.value === 'next' ? nextWeekStart() : thisWeekStart()))
+// 周次下拉选项：本周起未来 12 周（编辑时可下拉调整归属周次，修正填错的周）
+const weekOptions = ref([])
+function buildWeekOptions() {
+  const opts = []
+  for (let i = 0; i < 12; i++) {
+    const m = mondayOf(new Date()); m.setDate(m.getDate() + i * 7)
+    const e = new Date(m); e.setDate(e.getDate() + 6)
+    const s = fmtDate(m)
+    opts.push({ value: s, label: `${i === 0 ? '本周' : i === 1 ? '下周' : `${i + 1}周后`} ${s.slice(5)}~${fmtDate(e).slice(5)}` })
+  }
+  weekOptions.value = opts
+}
+function ensureWeekOption(ws) {
+  if (ws && !weekOptions.value.some((o) => o.value === ws)) {
+    const m = mondayOf(ws); const e = new Date(m); e.setDate(e.getDate() + 6)
+    weekOptions.value.push({ value: fmtDate(m), label: `${fmtDate(m).slice(5)}~${fmtDate(e).slice(5)}` })
+  }
+}
 // 显示周次范围（如 08-10 ~ 08-16），避免"本周/下周"归属混淆
 const goalWeekRange = computed(() => {
   const s = new Date(goalWeekStart.value)
@@ -525,19 +542,21 @@ async function loadGoal() {
 
 // ---------- M7 周目标条目 ----------
 function openGoalItem(g) {
-  if (g) Object.assign(goalForm, { id: g.id, goal: g.goal, deadline: g.deadline, user_id: g.user_id ?? null, week: goalWeek.value })
-  else Object.assign(goalForm, { id: null, goal: '', deadline: null, user_id: null, week: goalWeek.value })
+  if (g) {
+    Object.assign(goalForm, { id: g.id, goal: g.goal, deadline: g.deadline, user_id: g.user_id ?? null, weekStart: g.week_start })
+    ensureWeekOption(g.week_start)  // 目标在历史周时补进下拉选项，便于修正
+  } else {
+    Object.assign(goalForm, { id: null, goal: '', deadline: null, user_id: null, weekStart: goalWeekStart.value })
+  }
   goalVisible.value = true
 }
 
 async function saveGoal() {
   if (!goalForm.goal.trim()) { ElMessage.warning('请输入目标内容'); return }
   const payload = { goal: goalForm.goal, deadline: goalForm.deadline, user_id: goalForm.user_id || null }
-  if (goalForm.id) await updateWeeklyGoalItem(goalForm.id, payload)
-  else {
-    const ws = goalForm.week === 'next' ? nextWeekStart() : thisWeekStart()
-    await addWeeklyGoalItem(pid, { week_start: ws, ...payload })
-  }
+  const ws = goalForm.weekStart || thisWeekStart()
+  if (goalForm.id) await updateWeeklyGoalItem(goalForm.id, { ...payload, week_start: ws })
+  else await addWeeklyGoalItem(pid, { week_start: ws, ...payload })
   ElMessage.success('已保存')
   goalVisible.value = false
   loadGoal()
@@ -677,7 +696,7 @@ async function openProjectEdit() {
   if (project.value && editFormRef.value) await editFormRef.value.open(project.value)
 }
 
-onMounted(loadAll)
+onMounted(() => { buildWeekOptions(); loadAll() })
 </script>
 
 <style scoped>

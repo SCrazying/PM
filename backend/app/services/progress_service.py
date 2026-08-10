@@ -293,7 +293,7 @@ class ProgressService:
         self.db.refresh(item)
         return item
 
-    def update_weekly_goal_item(self, item_id: int, goal, deadline, user_id, user: dict) -> WeeklyGoalItem:
+    def update_weekly_goal_item(self, item_id: int, goal, deadline, user_id, week_start, user: dict) -> WeeklyGoalItem:
         item = self.db.get(WeeklyGoalItem, item_id)
         if not item:
             raise NotFoundError("周目标条目不存在")
@@ -302,6 +302,9 @@ class ProgressService:
         if goal is not None:
             item.goal = goal
         item.deadline = _coerce_date(deadline)
+        # 支持编辑时调整归属周次（修正填错的周）
+        if week_start:
+            item.week_start = self.week_start_of(_coerce_date(week_start))
         if user_id:
             member = self.db.execute(
                 select(ProjectMember).where(

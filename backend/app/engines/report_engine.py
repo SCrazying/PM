@@ -196,7 +196,7 @@ class ReportService:
                 select(User).where(User.id.in_(goal_user_ids))).scalars().all()}
         goal_items = [{
             "id": g.id, "goal": g.goal, "deadline": g.deadline,
-            "done": g.done, "done_at": g.done_at,
+            "done": g.done, "done_at": g.done_at, "week_start": g.week_start.isoformat(),
             "user_id": g.user_id, "user_name": goal_names.get(g.user_id),
             "overdue": bool(not g.done and g.deadline and g.deadline < date.today()),
         } for g in goal_rows]
