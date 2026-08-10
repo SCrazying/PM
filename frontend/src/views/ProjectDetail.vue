@@ -285,10 +285,10 @@
           <el-input v-model="goalForm.goal" type="textarea" :rows="2" placeholder="本周目标条目" />
         </el-form-item>
         <el-form-item label="归属周次">
-          <el-select v-model="goalForm.weekStart" style="width:100%">
+          <el-select v-model="goalForm.weekStart" filterable style="width:100%">
             <el-option v-for="w in weekOptions" :key="w.value" :label="w.label" :value="w.value" />
           </el-select>
-          <span class="pm-sub" style="margin-top:4px">可调整目标所在周（修正填错的周次）</span>
+          <span class="pm-sub" style="margin-top:4px">可调整目标所在周（含前几周，修正填错的周次）</span>
         </el-form-item>
         <el-form-item label="负责人">
           <el-select v-model="goalForm.user_id" clearable filterable placeholder="选择项目成员（可不选）" style="width:100%">
@@ -403,11 +403,19 @@ const goalForm = reactive({ id: null, goal: '', deadline: null, user_id: null, w
 // 周目标归属周切换（本周/下周）：本周有目标即可提前写下周目标（周五更新下周）
 const goalWeek = ref('this')
 const goalWeekStart = computed(() => (goalWeek.value === 'next' ? nextWeekStart() : thisWeekStart()))
-// 周次下拉选项：本周起未来 12 周（编辑时可下拉调整归属周次，修正填错的周）
+// 周次下拉选项：前 12 周 ~ 未来 12 周（含本周），编辑时可下拉调整归属周次（修正填错的周）
 const weekOptions = ref([])
 function buildWeekOptions() {
   const opts = []
-  for (let i = 0; i < 12; i++) {
+  // 前几周（过去）
+  for (let i = 12; i >= 1; i--) {
+    const m = mondayOf(new Date()); m.setDate(m.getDate() - i * 7)
+    const e = new Date(m); e.setDate(e.getDate() + 6)
+    const s = fmtDate(m)
+    opts.push({ value: s, label: `${i === 1 ? '上周' : `前${i}周`} ${s.slice(5)}~${fmtDate(e).slice(5)}` })
+  }
+  // 本周 + 未来
+  for (let i = 0; i <= 12; i++) {
     const m = mondayOf(new Date()); m.setDate(m.getDate() + i * 7)
     const e = new Date(m); e.setDate(e.getDate() + 6)
     const s = fmtDate(m)
