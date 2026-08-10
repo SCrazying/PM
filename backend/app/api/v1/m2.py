@@ -83,9 +83,12 @@ def add_weekly_goal_item(project_id: int, body: dict, user: dict = Depends(get_c
     if not goal:
         from app.core.responses import BizException
         raise BizException("目标内容不能为空")
+    try:
+        ws = date.fromisoformat(body["week_start"]) if body.get("week_start") else date.today()
+    except ValueError:
+        raise BizException("周次格式不正确（应为 YYYY-MM-DD）")
     item = ProgressService(db).add_weekly_goal_item(
-        project_id, body.get("week_start") or date.today(), goal, body.get("deadline"),
-        body.get("user_id"), user)
+        project_id, ws, goal, body.get("deadline"), body.get("user_id"), user)
     return ok({"id": item.id}, message="已添加")
 
 
