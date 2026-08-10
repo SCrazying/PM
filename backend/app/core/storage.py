@@ -2,12 +2,14 @@
 
 统一接口：put / get / delete / exists。返回的 file_path 含义：
   * local：磁盘绝对路径（供 FileResponse 直接返回）
-  * minio：bucket 内对象名（get 下载到临时文件供 FileResponse）
+  * minio：bucket 内对象名（get 下载到临时文件供 FileResponse，用唯一名避免并发覆盖）
 """
 from __future__ import annotations
 
+import io
 import os
 import tempfile
+import uuid
 from abc import ABC, abstractmethod
 
 from app.core.config import settings
@@ -69,12 +71,13 @@ class MinioStorage(StorageBackend):
             self._client.make_bucket(self._bucket)
 
     def put(self, key: str, content: bytes) -> str:
-        import io
         self._client.put_object(self._bucket, key, io.BytesIO(content), length=len(content))
         return key  # 对象名即存储路径
 
     def get_path(self, key: str) -> str:
-        tmp = os.path.join(tempfile.gettempdir(), f"pm_minio_{os.path.basename(key)}")
+        # 唯一临时文件名，避免不同 key 同名互相覆盖；保留扩展名便于 FileResponse 推断 MIME
+        ext = os.path.splitext(key)[1]
+        tmp = os.path.join(tempfile.gettempdir(), f"pm_minio_{uuid.uuid4().hex}{ext}")
         self._client.fget_object(self._bucket, key, tmp)
         return tmp
 

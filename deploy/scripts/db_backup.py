@@ -51,7 +51,13 @@ def find_pg_dump() -> str | None:
 
 
 def sqlalchemy_dump(outfile: str, database_url: str) -> None:
-    """无 pg_dump 兜底：用 SQLAlchemy 反射导出全库 schema + 数据 + 序列为 SQL。"""
+    """无 pg_dump 兜底：用 SQLAlchemy 反射导出全库**数据 + 序列**为 SQL（不含建表语句）。
+
+    恢复路径（幂等）：
+      1) 在空库上 `alembic upgrade head` 重建全部表/索引/约束（schema 完整）
+      2) `psql -f 本文件` 插入数据 + setval 重置序列
+    不导 CREATE TABLE（alembic 负责建表）；混合导出在已存在表上会失败。
+    """
     import json as _json
     import sqlalchemy as sa
     from sqlalchemy.orm import Session
@@ -77,18 +83,19 @@ def sqlalchemy_dump(outfile: str, database_url: str) -> None:
             return str(value)
         return "'" + str(value).replace("'", "''") + "'"
 
-    lines = ["-- PM-System SQLAlchemy 兜底备份（无 pg_dump）",
-             "-- 恢复方式：在空库上 psql -f 本文件（表已存在请先清库）",
+    lines = ["-- PM-System SQLAlchemy 兜底备份（无 pg_dump，仅数据 + 序列）",
+             "-- 恢复：先 alembic upgrade head 建表，再 psql -f 本文件插入数据",
              "SET session_replication_role = replica;", ""]
     with Session(engine) as db:
         for table in meta.sorted_tables:
-            lines.append(str(sa.schema.CreateTable(table).compile(dialect=engine.dialect)) + ";")
             rows = db.execute(table.select()).mappings().all()
-            if rows:
-                collist = ", ".join(table.columns.keys())
-                for row in rows:
-                    vals = [lit(row[c], table.columns[c]) for c in table.columns.keys()]
-                    lines.append(f"INSERT INTO {table.name} ({collist}) VALUES ({', '.join(vals)});")
+            if not rows:
+                continue
+            collist = ", ".join(f'"{c}"' for c in table.columns.keys())
+            lines.append(f"-- {table.name}（{len(rows)} 行）")
+            for row in rows:
+                vals = [lit(row[c], table.columns[c]) for c in table.columns.keys()]
+                lines.append(f'INSERT INTO "{table.name}" ({collist}) VALUES ({", ".join(vals)});')
             pk = table.primary_key.columns.keys()
             if len(pk) == 1:
                 lines.append(f"SELECT setval(pg_get_serial_sequence('{table.name}', '{pk[0]}'), "
@@ -125,7 +132,7 @@ def main() -> int:
         if pg_dump:
             outfile = os.path.join(output_dir, f"db_{ts}.sql")
             print(f"[INFO] 使用 pg_dump：{pg_dump}")
-            subprocess.run([pg_dump, plain_url, "-f", outfile], check=True, capture_output=True, timeout=180)
+            subprocess.run([pg_dump, plain_url, "-f", outfile], check=True, capture_output=True, timeout=600)
         else:
             outfile = os.path.join(output_dir, f"db_{ts}_fallback.sql")
             print("[INFO] 未找到 pg_dump，使用 SQLAlchemy 兜底导出")
@@ -140,7 +147,7 @@ def main() -> int:
     size = os.path.getsize(outfile)
     print(f"[OK] 备份完成：{outfile}（{size} 字节）")
 
-    # 清理旧备份（保留最近 keep 份，仅清理由本脚本/系统生成的 db_ 前缀文件）
+    # 清理旧备份（保留最近 keep 份；仅清理脚本生成的 db_*.sql 前缀文件，勿放同名手工归档到该目录）
     files = sorted(
         [os.path.join(output_dir, f) for f in os.listdir(output_dir) if f.startswith("db_") and f.endswith(".sql")],
         key=os.path.getmtime,

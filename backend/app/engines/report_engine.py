@@ -112,19 +112,23 @@ class ReportService:
                 risks.append({"progress_id": p.id, "date": d, "author": uname, "risk": p.risk,
                               "resolved": p.risk_resolved})
 
-        # 今日目标：昨天报工时填的"明日计划"（若昨天是周末，顺延取上一工作日），便于周会过今日安排
-        tp_date = date.today() - timedelta(days=1)
-        while tp_date.weekday() >= 5:
-            tp_date -= timedelta(days=1)
-        today_plan = [{
-            "author": uname, "plan": p.tomorrow_plan, "date": p.progress_date.isoformat(),
-        } for p, uname in self.db.execute(
-            select(Progress, User.display_name).join(User, User.id == Progress.author_id).where(
-                Progress.project_id == project_id, Progress.progress_date == tp_date,
-                Progress.is_deleted.is_(False), Progress.tomorrow_plan.isnot(None),
-                Progress.tomorrow_plan != "",
-            ).order_by(Progress.id)
-        ).all()]
+        # 今日目标：昨天报工时填的"明日计划"（若昨天是周末，顺延取上一工作日），便于周会过今日安排。
+        # 仅当"今天"落在所选周 [ws, we] 内时才计算——看历史周时不显示无关的今日目标。
+        today_plan = []
+        today = date.today()
+        if ws <= today <= we:
+            tp_date = today - timedelta(days=1)
+            while tp_date.weekday() >= 5:
+                tp_date -= timedelta(days=1)
+            today_plan = [{
+                "author": uname, "plan": p.tomorrow_plan, "date": p.progress_date.isoformat(),
+            } for p, uname in self.db.execute(
+                select(Progress, User.display_name).join(User, User.id == Progress.author_id).where(
+                    Progress.project_id == project_id, Progress.progress_date == tp_date,
+                    Progress.is_deleted.is_(False), Progress.tomorrow_plan.isnot(None),
+                    Progress.tomorrow_plan != "",
+                ).order_by(Progress.id)
+            ).all()]
 
         # 全部一级节点（周会"当前节点"列显示所有节点，每行一个）
         top_nodes = self.db.execute(
