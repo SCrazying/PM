@@ -172,6 +172,26 @@
         <ProjectFiles :project-id="pid" :owner-id="project?.owner_id" />
 
         <div class="pm-card" style="margin-top:14px">
+          <div class="pm-flex-between" style="margin-bottom:8px">
+            <span class="card-title">风险管理
+              <el-tag v-if="openRiskCount" size="small" type="warning" effect="plain" style="margin-left:6px">{{ openRiskCount }} 未解决</el-tag>
+            </span>
+          </div>
+          <div v-if="risks.length" class="risk-list">
+            <div v-for="r in risks" :key="r.progress_id" class="risk-item" :class="{ resolved: r.resolved }"
+                 @click="onToggleRisk(r)" :title="r.resolved ? '点击重新打开风险' : '点击关闭风险'">
+              <el-icon :size="14" class="risk-ico"><CircleCheckFilled v-if="r.resolved" /><WarningFilled v-else /></el-icon>
+              <div class="risk-body">
+                <div class="risk-txt">{{ r.risk }}</div>
+                <div class="risk-meta">[{{ r.date }}] {{ r.author }}</div>
+              </div>
+              <el-tag v-if="r.resolved" size="small" type="success" effect="plain">已解决</el-tag>
+            </div>
+          </div>
+          <div v-else class="empty">暂无风险</div>
+        </div>
+
+        <div class="pm-card" style="margin-top:14px">
           <div class="card-title" style="margin-bottom:8px">进展时间线</div>
           <el-timeline v-if="progressList.length" class="ptl">
             <el-timeline-item v-for="p in progressList" :key="p.id" :timestamp="`${p.progress_date} · ${p.author_name}`" placement="top">
@@ -317,9 +337,9 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addMember, addReview, addSubnode, addWeeklyGoalItem, createTask, deleteSubnode, deleteTask,
-  deleteWeeklyGoalItem, getProject, listMembers, listProgress, listReviews, listTasks,
+  deleteWeeklyGoalItem, getProject, listMembers, listProgress, listProjectRisks, listReviews, listTasks,
   listUserOptions, nodeAdvance, nodeComplete, nodeCompletion, projectCompletion,
-  projectWeekly, removeMember, setSubnodeStatus, setTaskStatus, setWeeklyGoalItemDone,
+  projectWeekly, removeMember, setProgressRiskResolved, setSubnodeStatus, setTaskStatus, setWeeklyGoalItemDone,
   updateProgress, updateSubnode, updateTask, updateWeeklyGoalItem,
 } from '../api'
 import { useUserStore } from '../store/user'
@@ -340,6 +360,8 @@ const users = ref([])
 const currentNode = ref(null)
 const reviews = ref([])
 const progressList = ref([])
+const risks = ref([])
+const openRiskCount = computed(() => risks.value.filter((r) => !r.resolved).length)
 const progressVisible = ref(false)
 const progressSaving = ref(false)
 const progressForm = reactive({ id: null, progress_date: '', node_name: '', today_work: '', tomorrow_plan: '', risk: '' })
@@ -406,7 +428,7 @@ async function loadAll() {
     if (!currentNode.value && nodes.value.length) {
       currentNode.value = nodes.value.find((n) => n.id === project.value.current_node_id) || nodes.value[0]
     }
-    await Promise.all([loadTasks(), loadProgress(), loadGoal(), loadProjComp()])
+    await Promise.all([loadTasks(), loadProgress(), loadGoal(), loadProjComp(), loadRisks()])
   } finally { loading.value = false }
 }
 
@@ -419,6 +441,17 @@ async function loadTasks() {
   subnodes.value = cur?.subnodes || []
 }
 async function loadProgress() { progressList.value = (await listProgress(pid, {})).slice(0, 20) }
+
+// ---------- 风险管理 ----------
+async function loadRisks() {
+  risks.value = await listProjectRisks(pid).catch(() => [])
+}
+async function onToggleRisk(r) {
+  const target = !r.resolved
+  await setProgressRiskResolved(r.progress_id, target).catch(() => {})
+  r.resolved = target
+  ElMessage.success(target ? '已关闭风险' : '已重新打开风险')
+}
 async function loadProjComp() { projComp.value = await projectCompletion(pid).catch(() => ({ total: 0, passed: 0, percent: 0 })) }
 // 竞态守卫：快速切换本周/下周时，旧请求晚返回不覆盖新周数据
 let goalLoadSeq = 0
@@ -633,6 +666,16 @@ onMounted(loadAll)
 .gi-overdue { color: var(--pm-danger); font-weight: 600; }
 .gi-ops { display: flex; gap: 2px; flex-shrink: 0; }
 .empty { color: var(--pm-text-3); font-size: 13px; padding: 8px 0; }
+.risk-list { display: flex; flex-direction: column; gap: 5px; max-height: 260px; overflow-y: auto; }
+.risk-item { display: flex; align-items: flex-start; gap: 8px; padding: 7px 9px; border-radius: 6px; cursor: pointer; background: var(--pm-st-delayed-bg); border: 1px solid transparent; }
+.risk-item:hover { outline: 1px solid var(--pm-danger); }
+.risk-item.resolved { background: var(--pm-st-completed-bg); }
+.risk-ico { color: var(--pm-danger); flex-shrink: 0; margin-top: 2px; }
+.risk-item.resolved .risk-ico { color: var(--pm-success); }
+.risk-body { flex: 1; min-width: 0; }
+.risk-txt { font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+.risk-item.resolved .risk-txt { color: var(--pm-text-3); text-decoration: line-through; }
+.risk-meta { color: var(--pm-text-3); font-size: 11.5px; margin-top: 2px; }
 .member-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--pm-border); }
 .member-item:last-child { border-bottom: none; }
 .avatar-sm { width: 26px; height: 26px; border-radius: 50%; background: var(--pm-gradient); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }

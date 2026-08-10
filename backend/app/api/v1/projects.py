@@ -8,12 +8,30 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.responses import ok, page_result
+from app.models.misc import Progress
 from app.models.project import ProjectNode
+from app.models.user import User
 from app.schemas.project import MemberIn, ProjectCreate, ProjectOut, ProjectUpdate
 from app.services.audit_service import record_audit
 from app.services.project_service import ProjectService
 
 router = APIRouter()
+
+
+@router.get("/{project_id}/risks")
+def list_project_risks(project_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """项目风险管理：汇总各进展填报的风险（含已关闭），供详情页单独管理。"""
+    rows = db.execute(
+        select(Progress, User.display_name).join(User, User.id == Progress.author_id).where(
+            Progress.project_id == project_id,
+            Progress.is_deleted.is_(False),
+            Progress.risk.isnot(None), Progress.risk != "",
+        ).order_by(Progress.progress_date.desc(), Progress.id.desc())
+    ).all()
+    return ok([{
+        "progress_id": p.id, "date": p.progress_date, "author": uname,
+        "risk": p.risk, "resolved": p.risk_resolved,
+    } for p, uname in rows])
 
 
 @router.get("")

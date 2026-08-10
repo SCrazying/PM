@@ -8,6 +8,7 @@ export const createMachineModel = (name) => request.post('/machine-models', { na
 export const deleteMachineModel = (id) => request.delete(`/machine-models/${id}`)
 export const createProject = (data) => request.post('/projects', data)
 export const getProject = (id) => request.get(`/projects/${id}`)
+export const listProjectRisks = (id) => request.get(`/projects/${id}/risks`)
 export const updateProject = (id, data) => request.put(`/projects/${id}`, data)
 export const deleteProject = (id) => request.delete(`/projects/${id}`)
 export const restoreProject = (id) => request.post(`/projects/${id}/restore`)
