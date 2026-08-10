@@ -132,6 +132,7 @@
                 <el-radio-button value="this">本周</el-radio-button>
                 <el-radio-button value="next">下周</el-radio-button>
               </el-radio-group>
+              <span class="pm-sub" style="margin-left:6px; font-size:12px">{{ goalWeekRange }}</span>
               <el-tag v-if="goalItems.length && goalItems.filter(g=>g.done).length===goalItems.length" size="small" type="success" style="margin-left:6px">全部完成</el-tag>
             </span>
             <el-button size="small" link type="primary" @click="openGoalItem()" v-if="canEdit">+ 添加</el-button>
@@ -323,7 +324,7 @@ import {
 import { useUserStore } from '../store/user'
 import ProjectForm from '../components/ProjectForm.vue'
 import ProjectFiles from '../components/ProjectFiles.vue'
-import { nextWeekStart, thisWeekStart } from '../utils/date'
+import { fmtDate, nextWeekStart, thisWeekStart } from '../utils/date'
 
 const route = useRoute()
 const store = useUserStore()
@@ -361,6 +362,12 @@ const goalForm = reactive({ id: null, goal: '', deadline: null, user_id: null, w
 // 周目标归属周切换（本周/下周）：本周有目标即可提前写下周目标（周五更新下周）
 const goalWeek = ref('this')
 const goalWeekStart = computed(() => (goalWeek.value === 'next' ? nextWeekStart() : thisWeekStart()))
+// 显示周次范围（如 08-10 ~ 08-16），避免"本周/下周"归属混淆
+const goalWeekRange = computed(() => {
+  const s = new Date(goalWeekStart.value)
+  const e = new Date(s); e.setDate(e.getDate() + 6)
+  return `${goalWeekStart.value.slice(5)} ~ ${fmtDate(e).slice(5)}`
+})
 const editFormRef = ref()
 
 const ownerName = computed(() => userName(project.value?.owner_id))
@@ -412,8 +419,13 @@ async function loadTasks() {
 }
 async function loadProgress() { progressList.value = (await listProgress(pid, {})).slice(0, 20) }
 async function loadProjComp() { projComp.value = await projectCompletion(pid).catch(() => ({ total: 0, passed: 0, percent: 0 })) }
+// 竞态守卫：快速切换本周/下周时，旧请求晚返回不覆盖新周数据
+let goalLoadSeq = 0
 async function loadGoal() {
-  goalItems.value = await listWeeklyGoalItems(pid, goalWeekStart.value).catch(() => [])
+  const seq = ++goalLoadSeq
+  const ws = goalWeekStart.value
+  const data = await listWeeklyGoalItems(pid, ws).catch(() => [])
+  if (seq === goalLoadSeq) goalItems.value = data
 }
 
 // ---------- M7 周目标条目 ----------
