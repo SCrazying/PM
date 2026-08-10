@@ -1,4 +1,5 @@
 """FastAPI 应用入口。"""
+import asyncio
 import os
 from contextlib import asynccontextmanager
 
@@ -15,10 +16,30 @@ setup_logging()
 logger = get_logger("pm.main")
 
 
+async def _audit_cleanup_loop() -> None:
+    """后台任务：每日清理过期审计日志（保留期 config audit.retention_months）。"""
+    from app.core.database import SessionLocal
+    from app.services.audit_service import cleanup_expired
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                n = cleanup_expired(db)
+                if n:
+                    logger.info("清理过期审计日志 %s 条", n)
+            finally:
+                db.close()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("审计日志清理失败: %s", e)
+        await asyncio.sleep(86400)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("PM-System backend starting (env=%s)", settings.APP_ENV)
+    cleanup_task = asyncio.create_task(_audit_cleanup_loop())
     yield
+    cleanup_task.cancel()
     logger.info("PM-System backend stopped")
 
 

@@ -1,5 +1,5 @@
 """审计服务：记录关键操作（变更字段 diff）。"""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
@@ -56,3 +56,16 @@ def diff_dict(before: dict, after: dict, fields: list[str]) -> dict:
 
 def model_to_dict(obj: Any, fields: list[str]) -> dict:
     return {f: getattr(obj, f, None) for f in fields}
+
+
+def cleanup_expired(db: Session, days: Optional[int] = None) -> int:
+    """清理过期审计日志（默认按 config audit.retention_months，按月*30天）。返回删除条数。"""
+    if days is None:
+        from app.models.misc import Config
+        row = db.get(Config, "audit.retention_months")
+        months = int(row.value) if row and row.value and str(row.value).isdigit() else 24
+        days = months * 30
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    result = db.query(AuditLog).filter(AuditLog.created_at < cutoff).delete(synchronize_session=False)
+    db.commit()
+    return result
