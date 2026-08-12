@@ -78,9 +78,18 @@ ALLOWED_EXT = set((os.environ.get("ATTACH_EXT") or
 
 
 def _save_upload(file: UploadFile, content: bytes) -> str:
-    """存储到当前后端（本地磁盘 / MinIO），返回 file_path。"""
+    """存储到当前后端（本地磁盘 / MinIO），返回 file_path。
+
+    存储键只用随机 UUID + 消毒后的扩展名，不掺原始文件名——原始文件名可能含
+    路径分隔符（`../`、反斜杠）等穿越字符，直接拼进键名会经 LocalStorage 的
+    join 写出 UPLOAD_DIR 之外（CWE-22）。原始文件名仅存 DB 展示用，不进文件路径。
+    """
+    import re
     import uuid
-    key = f"{uuid.uuid4().hex}_{file.filename}"
+    # 扩展名只保留字母数字（上传前已过 ALLOWED_EXT 白名单，这里再做纵深消毒）
+    ext = (file.filename.rsplit(".", 1)[-1] if file.filename else "") or ""
+    ext = re.sub(r"[^A-Za-z0-9]", "", ext)
+    key = f"{uuid.uuid4().hex}.{ext}" if ext else uuid.uuid4().hex
     return get_storage().put(key, content)
 
 
