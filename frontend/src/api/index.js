@@ -14,6 +14,7 @@ export const setProjectRiskResolved = (rid, resolved) => request.patch(`/risks/$
 export const deleteProjectRisk = (rid) => request.delete(`/risks/${rid}`)
 export const updateProject = (id, data) => request.put(`/projects/${id}`, data)
 export const deleteProject = (id) => request.delete(`/projects/${id}`)
+export const getProjectActivity = (id, params) => request.get(`/projects/${id}/activity-log`, { params })
 export const restoreProject = (id) => request.post(`/projects/${id}/restore`)
 export const listRecycleBin = (params) => request.get('/admin/recycle-bin', { params })
 export const restoreRecycleProjects = (project_ids) => request.post('/admin/recycle-bin/restore', { project_ids })

@@ -216,6 +216,23 @@
           </el-timeline>
           <div v-else class="empty">暂无进展</div>
         </div>
+
+        <div class="pm-card" style="margin-top:14px">
+          <div class="pm-flex-between" style="margin-bottom:8px">
+            <span class="card-title">操作流水</span>
+            <el-button v-if="activity.list.length < activity.total" size="small" link type="primary" :loading="activity.loading" @click="loadMoreActivity">加载更多</el-button>
+          </div>
+          <el-timeline v-if="activity.list.length" class="actl">
+            <el-timeline-item v-for="a in activity.list" :key="a.id" :timestamp="fmtActTime(a.time)" placement="top" :type="actTag(a.action)">
+              <div class="act-row">
+                <span class="act-actor">{{ a.actor_name }}</span>
+                <el-tag size="small" effect="plain" :type="actTag(a.action)">{{ a.action_label }}{{ a.target_label }}</el-tag>
+                <div class="act-summary">{{ a.summary }}</div>
+              </div>
+            </el-timeline-item>
+          </el-timeline>
+          <div v-else class="empty">暂无操作记录</div>
+        </div>
       </el-col>
     </el-row>
 
@@ -347,7 +364,8 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addMember, addReview, addSubnode, addWeeklyGoalItem, createTask, deleteSubnode, deleteTask,
-  deleteWeeklyGoalItem, addProjectRisk, deleteProjectRisk, getProject, getReportWeeks, listMembers, listProgress, listProjectRisks, listReviews, listTasks,
+  deleteWeeklyGoalItem, addProjectRisk, deleteProjectRisk, getProject, getProjectActivity, getReportWeeks,
+  listMembers, listProgress, listProjectRisks, listReviews, listTasks,
   listUserOptions, nodeAdvance, nodeComplete, nodeCompletion, projectCompletion,
   projectWeekly, removeMember, setProgressRiskResolved, setProjectRiskResolved, setSubnodeStatus, setTaskStatus, setWeeklyGoalItemDone,
   updateProgress, updateSubnode, updateTask, updateWeeklyGoalItem,
@@ -385,6 +403,8 @@ const projComp = ref({ total: 0, passed: 0, percent: 0 })
 const subnodes = ref([])
 const subnodeVisible = ref(false)
 const subnodeForm = reactive({ id: null, name: '', planned_end: null })
+// 操作流水（V1.0.5）
+const activity = reactive({ list: [], total: 0, page: 1, loading: false })
 
 const statusMap = { not_started: '未开始', in_progress: '进行中', delayed: '延期', suspended: '暂停', completed: '已完成' }
 const taskVisible = ref(false)
@@ -447,8 +467,27 @@ async function loadAll() {
     if (!currentNode.value && nodes.value.length) {
       currentNode.value = nodes.value.find((n) => n.id === project.value.current_node_id) || nodes.value[0]
     }
-    await Promise.all([loadTasks(), loadProgress(), loadGoal(), loadProjComp(), loadRisks()])
+    await Promise.all([loadTasks(), loadProgress(), loadGoal(), loadProjComp(), loadRisks(), loadActivity()])
   } finally { loading.value = false }
+}
+
+// ---------- 操作流水（V1.0.5） ----------
+function fmtActTime(t) { return t ? t.replace('T', ' ').slice(0, 19) : '—' }
+const actTag = (a) => ({ create: 'success', update: 'primary', delete: 'danger', review: 'warning', restore: 'success', force_transition: 'warning' }[a] || 'info')
+async function loadActivity() {
+  if (activity.loading) return
+  activity.loading = true
+  try {
+    const data = await getProjectActivity(pid, { page: activity.page, size: 20 })
+    activity.list = activity.page === 1 ? data.list : activity.list.concat(data.list)
+    activity.total = data.total
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '操作记录加载失败')
+  } finally { activity.loading = false }
+}
+async function loadMoreActivity() {
+  activity.page += 1
+  await loadActivity()
 }
 
 async function loadTasks() {
@@ -761,4 +800,8 @@ onMounted(async () => {
 .sn-name { font-size: 14px; }
 .sn-ops { margin-left: auto; display: flex; gap: 4px; }
 .subnode-empty { padding: 4px 0; }
+.actl { max-height: 420px; overflow-y: auto; }
+.act-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.act-actor { font-size: 13px; font-weight: 600; color: var(--pm-text-1); }
+.act-summary { flex-basis: 100%; font-size: 12.5px; color: var(--pm-text-2); white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
 </style>

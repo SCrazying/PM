@@ -12,7 +12,7 @@ from app.models.misc import Progress, ProjectRisk
 from app.models.project import Project, ProjectMember, ProjectNode
 from app.models.user import User
 from app.schemas.project import MemberIn, ProjectCreate, ProjectOut, ProjectUpdate
-from app.services.audit_service import record_audit
+from app.services.audit_service import query_project_activity, record_audit
 from app.services.project_service import ProjectService
 
 router = APIRouter()
@@ -107,6 +107,19 @@ def delete_project_risk(rid: int, user: dict = Depends(get_current_user), db: Se
     return ok(message="已删除")
 
 
+@router.get("/{project_id}/activity-log")
+def project_activity_log(project_id: int, page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=100),
+                         action: str | None = None, date_from: date | None = None, date_to: date | None = None,
+                         user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """项目操作流水线：该项目相关的操作历史（编辑项目/节点计划时间/周目标/成员/任务/附件等），
+    项目成员/负责人/管理员可查看（V1.0.5）。"""
+    svc = ProjectService(db)
+    project = svc.get_project(project_id)
+    svc.check_member(project, user)
+    items, total = query_project_activity(db, project_id, page, size, action, date_from, date_to)
+    return page_result(items, total, page, size)
+
+
 @router.get("")
 def list_projects(
     status: str | None = None,
@@ -172,8 +185,23 @@ def get_project(project_id: int, user: dict = Depends(get_current_user), db: Ses
 @router.put("/{project_id}")
 def update_project(project_id: int, body: ProjectUpdate, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     svc = ProjectService(db)
+    old = db.get(Project, project_id)
+    # 修改前快照（identity map 复用同一对象，service 改后旧值即丢失）
+    before = {f: getattr(old, f, None) for f in
+              ("name", "code", "machine_model", "owner_id", "status", "start_date", "end_date", "description")} if old else {}
     p = svc.update_project(project_id, body, user)
-    record_audit(db, user["user_id"], "update", "project", str(project_id), body.model_dump(exclude_none=True))
+    # 变更 diff：标量字段 before → after（日期转字符串）；列表字段（如 node_deadlines）原样快照
+    detail = {}
+    for f, v in body.model_dump(exclude_none=True).items():
+        if isinstance(v, (list, dict)):
+            detail[f] = v
+            continue
+        b = before.get(f)
+        before_s = b.isoformat() if hasattr(b, "isoformat") else b
+        after_s = v.isoformat() if hasattr(v, "isoformat") else v
+        if before_s != after_s:
+            detail[f] = {"before": before_s, "after": after_s}
+    record_audit(db, user["user_id"], "update", "project", str(project_id), detail)
     return ok(ProjectOut.model_validate(p).model_dump(), message="更新成功")
 
 

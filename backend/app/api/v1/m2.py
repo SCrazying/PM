@@ -13,6 +13,7 @@ from app.engines.board_engine import BoardService
 from app.engines.node_flow_engine import NodeFlowService
 from app.engines.report_engine import ReportService
 from app.models.misc import Progress, ProjectWeeklyGoal, WeeklyGoalItem
+from app.models.project import ProjectNode
 from app.schemas.progress import ProgressCreate, ProgressUpdate, WeeklyGoalIn
 from app.services.audit_service import record_audit
 from app.services.progress_service import ProgressService
@@ -217,14 +218,16 @@ def board_summary(user: dict = Depends(get_current_user), db: Session = Depends(
 def node_transition(node_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     target = body.get("target")
     n = NodeFlowService(db).transition(node_id, target, user)
-    record_audit(db, user["user_id"], "update", "node", str(node_id), {"status": target})
+    record_audit(db, user["user_id"], "update", "node", str(node_id),
+                 {"status": target, "project_id": n.project_id})
     return ok({"id": n.id, "status": n.status}, message="已流转")
 
 
 @router.post("/nodes/{node_id}/advance")
 def node_advance(node_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     n = NodeFlowService(db).advance_to_next(node_id, user)
-    record_audit(db, user["user_id"], "update", "node", str(node_id), {"status": n.status, "action": "advance"})
+    record_audit(db, user["user_id"], "update", "node", str(node_id),
+                 {"status": n.status, "action": "advance", "project_id": n.project_id})
     return ok({"id": n.id, "status": n.status}, message="已进入下一节点")
 
 
@@ -232,7 +235,8 @@ def node_advance(node_id: int, user: dict = Depends(get_current_user), db: Sessi
 def node_force_transition(node_id: int, body: dict, user: dict = Depends(require_admin), db: Session = Depends(get_db)):
     target = body.get("target")
     n = NodeFlowService(db).force_transition(node_id, target, user)
-    record_audit(db, user["user_id"], "force_transition", "node", str(node_id), {"status": target})
+    record_audit(db, user["user_id"], "force_transition", "node", str(node_id),
+                 {"status": target, "project_id": n.project_id})
     return ok({"id": n.id, "status": n.status}, message="已强制流转")
 
 
@@ -241,7 +245,9 @@ def add_review(node_id: int, body: dict, user: dict = Depends(get_current_user),
     r = NodeFlowService(db).add_review(
         node_id, body.get("conclusion"), body.get("comment"),
         body.get("review_date") or date.today(), user)
-    record_audit(db, user["user_id"], "review", "node", str(node_id), {"conclusion": r.conclusion})
+    node = db.get(ProjectNode, node_id)
+    record_audit(db, user["user_id"], "review", "node", str(node_id),
+                 {"conclusion": r.conclusion, "project_id": node.project_id if node else None})
     return ok({"id": r.id}, message="评审已记录")
 
 
@@ -256,7 +262,8 @@ def list_reviews(node_id: int, user: dict = Depends(get_current_user), db: Sessi
 @router.post("/nodes/{node_id}/complete")
 def complete_node(node_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     n = NodeFlowService(db).complete_node(node_id, user)
-    record_audit(db, user["user_id"], "update", "node", str(node_id), {"status": "passed"})
+    record_audit(db, user["user_id"], "update", "node", str(node_id),
+                 {"status": "passed", "project_id": n.project_id})
     return ok({"id": n.id, "status": n.status, "actual_end": n.actual_end}, message="节点已完成")
 
 
