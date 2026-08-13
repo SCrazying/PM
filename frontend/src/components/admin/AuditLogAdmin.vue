@@ -69,8 +69,8 @@ const actionMap = {
 }
 const targetMap = {
   project: '项目', project_risk: '项目风险', task: '任务', node: '节点', user: '用户', machine_model: '机型',
-  tr_template: '模板', member: '成员', progress: '进展', weekly_goal: '周目标', attachment: '附件',
-  config: '配置', project_ledger: '台账', system: '系统', ai_summary: 'AI总结', subnode: '子节点',
+  tr_template: '模板', member: '成员', progress: '进展', weekly_goal: '周目标', weekly_goal_item: '周目标条目',
+  attachment: '附件', config: '配置', project_ledger: '台账', system: '系统', ai_summary: 'AI总结', subnode: '子节点',
   role: '角色', notification: '通知',
 }
 const actionText = (a) => actionMap[a] || a

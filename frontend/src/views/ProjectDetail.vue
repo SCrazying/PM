@@ -467,27 +467,52 @@ async function loadAll() {
     if (!currentNode.value && nodes.value.length) {
       currentNode.value = nodes.value.find((n) => n.id === project.value.current_node_id) || nodes.value[0]
     }
-    await Promise.all([loadTasks(), loadProgress(), loadGoal(), loadProjComp(), loadRisks(), loadActivity()])
+    await Promise.all([loadTasks(), loadProgress(), loadGoal(), loadProjComp(), loadRisks(), refreshActivity()])
   } finally { loading.value = false }
 }
 
 // ---------- 操作流水（V1.0.5） ----------
-function fmtActTime(t) { return t ? t.replace('T', ' ').slice(0, 19) : '—' }
+function fmtActTime(t) {
+  if (!t) return '—'
+  // 后端 ISO 带时区偏移，new Date 转浏览器本地时间显示（与 AuditLogAdmin.fmtTime 一致）
+  const d = new Date(t)
+  if (isNaN(d.getTime())) return t.replace('T', ' ').slice(0, 19)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
 const actTag = (a) => ({ create: 'success', update: 'primary', delete: 'danger', review: 'warning', restore: 'success', force_transition: 'warning' }[a] || 'info')
-async function loadActivity() {
-  if (activity.loading) return
+// 竞态守卫：刷新与加载更多并发时，旧响应晚到不覆盖新数据（参照 goalLoadSeq）
+let actSeq = 0
+async function refreshActivity() {
+  const seq = ++actSeq
+  activity.page = 1
   activity.loading = true
   try {
-    const data = await getProjectActivity(pid, { page: activity.page, size: 20 })
-    activity.list = activity.page === 1 ? data.list : activity.list.concat(data.list)
+    const data = await getProjectActivity(pid, { page: 1, size: 20 })
+    if (seq !== actSeq) return  // 已被更新的请求取代，丢弃旧响应
+    activity.list = data.list
     activity.total = data.total
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || '操作记录加载失败')
-  } finally { activity.loading = false }
+  } finally {
+    if (seq === actSeq) activity.loading = false
+  }
 }
 async function loadMoreActivity() {
+  if (activity.loading) return
   activity.page += 1
-  await loadActivity()
+  const seq = ++actSeq
+  activity.loading = true
+  try {
+    const data = await getProjectActivity(pid, { page: activity.page, size: 20 })
+    if (seq !== actSeq) return  // 已被更新的请求取代，丢弃旧响应
+    activity.list = activity.list.concat(data.list)
+    activity.total = data.total
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '操作记录加载失败')
+  } finally {
+    if (seq === actSeq) activity.loading = false
+  }
 }
 
 async function loadTasks() {

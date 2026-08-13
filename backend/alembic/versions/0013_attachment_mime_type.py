@@ -34,4 +34,13 @@ def downgrade() -> None:
     bind = op.get_bind()
     if not sa.inspect(bind).has_table("attachment"):
         return
+    # 长度守卫：若已有超 64 字符的 mime_type（如 xlsx 的 65 字符），
+    # PG 的 ALTER COLUMN TYPE 会直接报 value too long 而非截断，
+    # 必须先中止回滚，避免回滚链在真实数据上炸掉。
+    max_len = bind.execute(sa.text("SELECT max(length(mime_type)) FROM attachment")).scalar()
+    if max_len and int(max_len) > 64:
+        raise RuntimeError(
+            "无法回滚 0013：attachment.mime_type 已存在超过 64 字符的值"
+            f"（当前最大值 {max_len}）。请保留 VARCHAR(255) 或先迁移数据。"
+        )
     op.alter_column("attachment", "mime_type", type_=sa.String(length=64))

@@ -107,7 +107,7 @@ def add_weekly_goal_item(project_id: int, body: dict, user: dict = Depends(get_c
         raise BizException("周次格式不正确（应为 YYYY-MM-DD）")
     item = ProgressService(db).add_weekly_goal_item(
         project_id, ws, goal, body.get("deadline"), body.get("user_id"), user)
-    record_audit(db, user["user_id"], "create", "weekly_goal", str(item.id),
+    record_audit(db, user["user_id"], "create", "weekly_goal_item", str(item.id),
                  {"project_id": project_id, "week_start": str(ws), "goal": goal,
                   "deadline": str(body.get("deadline") or "")[:10] if body.get("deadline") else None,
                   "user_id": body.get("user_id")})
@@ -118,8 +118,9 @@ def add_weekly_goal_item(project_id: int, body: dict, user: dict = Depends(get_c
 def update_weekly_goal_item(item_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     item = ProgressService(db).update_weekly_goal_item(
         item_id, body.get("goal"), body.get("deadline"), body.get("user_id"), body.get("week_start"), user)
-    record_audit(db, user["user_id"], "update", "weekly_goal", str(item_id),
-                 {"goal": body.get("goal"), "deadline": str(body.get("deadline") or "")[:10] if body.get("deadline") else None,
+    record_audit(db, user["user_id"], "update", "weekly_goal_item", str(item_id),
+                 {"project_id": item.project_id,
+                  "goal": body.get("goal"), "deadline": str(body.get("deadline") or "")[:10] if body.get("deadline") else None,
                   "user_id": body.get("user_id"), "week_start": str(body.get("week_start") or "")[:10] if body.get("week_start") else None})
     return ok({"id": item.id}, message="已更新")
 
@@ -127,14 +128,18 @@ def update_weekly_goal_item(item_id: int, body: dict, user: dict = Depends(get_c
 @router.patch("/weekly-goal-items/{item_id}/done")
 def set_weekly_goal_item_done(item_id: int, body: dict, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     item = ProgressService(db).set_weekly_goal_item_done(item_id, bool(body.get("done")), user)
-    record_audit(db, user["user_id"], "update", "weekly_goal", str(item_id), {"done": bool(body.get("done"))})
+    record_audit(db, user["user_id"], "update", "weekly_goal_item", str(item_id),
+                 {"project_id": item.project_id, "done": bool(body.get("done"))})
     return ok({"id": item.id, "done": item.done, "done_at": item.done_at}, message="已更新")
 
 
 @router.delete("/weekly-goal-items/{item_id}")
 def delete_weekly_goal_item(item_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    # 硬删前先取 project_id，否则删除后无法归属到项目流水线
+    item = db.get(WeeklyGoalItem, item_id)
+    pid = item.project_id if item else None
     ProgressService(db).delete_weekly_goal_item(item_id, user)
-    record_audit(db, user["user_id"], "delete", "weekly_goal", str(item_id))
+    record_audit(db, user["user_id"], "delete", "weekly_goal_item", str(item_id), {"project_id": pid})
     return ok(message="已删除")
 
 

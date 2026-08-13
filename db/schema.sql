@@ -362,6 +362,7 @@ CREATE TABLE audit_log (
 CREATE INDEX ix_audit_target ON audit_log(target_type, target_id);
 CREATE INDEX ix_audit_actor  ON audit_log(actor_id, created_at);
 CREATE INDEX ix_audit_time   ON audit_log(created_at);
+CREATE INDEX ix_audit_action ON audit_log(action);
 COMMENT ON TABLE audit_log IS '审计日志（只增不删，设保留期）';
 
 CREATE TABLE config (

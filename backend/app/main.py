@@ -61,7 +61,12 @@ def _mount_frontend(app: FastAPI) -> None:
             # 真实存在的静态资源直接返回（assets/js/css 等）
             if full_path:
                 candidate = os.path.normpath(os.path.join(dist_dir, full_path))
-                if candidate.startswith(dist_dir) and os.path.isfile(candidate):
+                # 用 commonpath 校验包含关系：startswith 会把 distX 兄弟目录误判为安全
+                try:
+                    inside = os.path.commonpath([candidate, dist_dir]) == dist_dir
+                except ValueError:  # 不同盘符等，视为不安全
+                    inside = False
+                if inside and os.path.isfile(candidate):
                     return FileResponse(candidate)
             # SPA 路由回退到 index.html（支持 F5 刷新 /board /projects 等）
             index = os.path.join(dist_dir, "index.html")

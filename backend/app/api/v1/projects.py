@@ -74,7 +74,8 @@ def add_project_risk(project_id: int, body: dict, user: dict = Depends(get_curre
     db.add(pr)
     db.commit()
     db.refresh(pr)
-    record_audit(db, user["user_id"], "create", "project_risk", str(pr.id), {"project_id": project_id})
+    record_audit(db, user["user_id"], "create", "project_risk", str(project_id),
+                 {"risk_id": pr.id, "risk": pr.risk})
     return ok({"id": pr.id}, message="已添加")
 
 
@@ -89,8 +90,8 @@ def set_project_risk_resolved(rid: int, body: dict, user: dict = Depends(get_cur
     pr.resolved = bool(body.get("resolved"))
     pr.resolved_at = datetime.now(timezone.utc) if pr.resolved else None
     db.commit()
-    record_audit(db, user["user_id"], "update", "project_risk", str(rid),
-                 {"resolved": bool(body.get("resolved")), "risk": pr.risk})
+    record_audit(db, user["user_id"], "update", "project_risk", str(pr.project_id),
+                 {"risk_id": rid, "resolved": bool(body.get("resolved")), "risk": pr.risk})
     return ok({"id": pr.id, "resolved": pr.resolved}, message="已更新")
 
 
@@ -103,7 +104,8 @@ def delete_project_risk(rid: int, user: dict = Depends(get_current_user), db: Se
     _check_risk_perm(db, pr.project_id, user)
     db.delete(pr)
     db.commit()
-    record_audit(db, user["user_id"], "delete", "project_risk", str(rid))
+    record_audit(db, user["user_id"], "delete", "project_risk", str(pr.project_id),
+                 {"risk_id": rid})
     return ok(message="已删除")
 
 
@@ -191,8 +193,9 @@ def update_project(project_id: int, body: ProjectUpdate, user: dict = Depends(ge
               ("name", "code", "machine_model", "owner_id", "status", "start_date", "end_date", "description")} if old else {}
     p = svc.update_project(project_id, body, user)
     # 变更 diff：标量字段 before → after（日期转字符串）；列表字段（如 node_deadlines）原样快照
+    # exclude_unset：只记录客户端显式提交的字段，置 null（清空 end_date 等）也记录 before → None
     detail = {}
-    for f, v in body.model_dump(exclude_none=True).items():
+    for f, v in body.model_dump(exclude_unset=True).items():
         if isinstance(v, (list, dict)):
             detail[f] = v
             continue

@@ -25,4 +25,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
     if sa.inspect(bind).has_table("audit_log"):
-        op.drop_index("ix_audit_action", table_name="audit_log")
+        op.execute("DROP INDEX IF EXISTS ix_audit_action")

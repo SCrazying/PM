@@ -132,7 +132,8 @@ def update_node(node_id: int, body: NodeUpdate, user: dict = Depends(get_current
     n = ProjectService(db).update_node(node_id, body, user)
     # 变更 diff：before → after（日期转字符串），便于流水线展示
     detail = {"project_id": n.project_id}
-    for f, v in body.model_dump(exclude_none=True).items():
+    # exclude_unset：只记录客户端显式提交的字段，置 null（清空）也记录 before → None
+    for f, v in body.model_dump(exclude_unset=True).items():
         b = before.get(f)
         before_s = b.isoformat() if hasattr(b, "isoformat") else b
         after_s = v.isoformat() if hasattr(v, "isoformat") else v
@@ -172,7 +173,8 @@ def update_task(task_id: int, body: TaskUpdate, user: dict = Depends(get_current
     t = ProjectService(db).update_task(task_id, body, user)
     # 变更 diff：before → after（日期转字符串）
     detail = {"project_id": t.project_id}
-    for f, v in body.model_dump(exclude_none=True).items():
+    # exclude_unset：只记录客户端显式提交的字段，置 null（清空）也记录 before → None
+    for f, v in body.model_dump(exclude_unset=True).items():
         b = before.get(f)
         before_s = b.isoformat() if hasattr(b, "isoformat") else b
         after_s = v.isoformat() if hasattr(v, "isoformat") else v

@@ -93,6 +93,25 @@ def _save_upload(file: UploadFile, content: bytes) -> str:
     return get_storage().put(key, content)
 
 
+def _check_project_access(db: Session, project_id: int, user: dict) -> None:
+    """校验调用者是项目成员/负责人/admin（附件读/下载等，与上传侧对称）。
+
+    附件上传已校验成员，读/下载若不校验则任意登录用户可枚举并下载任意项目的
+    资料文件（IDOR）。"""
+    project = db.get(Project, project_id)
+    if not project or project.is_deleted:
+        raise NotFoundError("项目不存在")
+    if user["role"] == "admin" or project.owner_id == user["user_id"]:
+        return
+    member = db.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id, ProjectMember.user_id == user["user_id"],
+            ProjectMember.is_deleted.is_(False))
+    ).scalar_one_or_none()
+    if not member:
+        raise ForbiddenError("仅项目成员/负责人可查看资料")
+
+
 @router.post("/attachments")
 async def upload_attachment(project_id: int = Form(...), project_node_id: int = Form(None),
                             task_id: int = Form(None), review_id: int = Form(None),
@@ -114,8 +133,12 @@ async def upload_attachment(project_id: int = Form(...), project_node_id: int = 
     ext = (file.filename.rsplit(".", 1)[-1] or "").lower()
     if ext not in ALLOWED_EXT:
         raise BizException(f"不支持的文件类型 .{ext}")
+    # 读前按 Content-Length 预检，拒绝超大文件整读进内存
+    limit = settings.ATTACHMENT_MAX_MB * 1024 * 1024
+    if file.size and file.size > limit:
+        raise BizException(f"文件超过 {settings.ATTACHMENT_MAX_MB}MB")
     content = await file.read()
-    if len(content) > settings.ATTACHMENT_MAX_MB * 1024 * 1024:
+    if len(content) > limit:
         raise BizException(f"文件超过 {settings.ATTACHMENT_MAX_MB}MB")
 
     fpath = _save_upload(file, content)
@@ -132,7 +155,8 @@ async def upload_attachment(project_id: int = Form(...), project_node_id: int = 
 
 @router.get("/projects/{project_id}/attachments")
 def list_attachments(project_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """项目资料/附件列表（含上传人姓名）。"""
+    """项目资料/附件列表（含上传人姓名）。仅项目成员/负责人/admin 可看。"""
+    _check_project_access(db, project_id, user)
     rows = db.execute(
         select(Attachment, User.display_name)
         .join(User, User.id == Attachment.uploaded_by, isouter=True)
@@ -152,13 +176,15 @@ def download_attachment(aid: int, user: dict = Depends(get_current_user), db: Se
     att = db.get(Attachment, aid)
     if not att or att.is_deleted:
         raise NotFoundError("附件不存在")
+    _check_project_access(db, att.project_id, user)  # 与上传对称，防越权下载（IDOR）
     try:
         path = get_storage().get_path(att.file_path)
     except Exception:  # noqa: BLE001  MinIO 下载失败/对象缺失
         raise NotFoundError("附件文件缺失")
     if not os.path.exists(path):
         raise NotFoundError("附件文件缺失")
-    record_audit(db, user["user_id"], "export", "attachment", str(aid), {"file": att.file_name})
+    record_audit(db, user["user_id"], "export", "attachment", str(aid),
+                 {"project_id": att.project_id, "file": att.file_name})
     return FileResponse(path, filename=att.file_name)
 
 
@@ -177,7 +203,8 @@ def delete_attachment(aid: int, user: dict = Depends(get_current_user), db: Sess
     att.deleted_at = datetime.now(timezone.utc)
     db.commit()
     get_storage().delete(att.file_path)
-    record_audit(db, user["user_id"], "delete", "attachment", str(aid), {"file": att.file_name})
+    record_audit(db, user["user_id"], "delete", "attachment", str(aid),
+                 {"project_id": att.project_id, "file": att.file_name})
     return ok(message="已删除")
 
 
@@ -301,7 +328,13 @@ def update_template(tid: int, body: dict, user: dict = Depends(require_admin), d
 @router.post("/import/excel/preview")
 async def import_preview(file: UploadFile = File(...), user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     from app.services.import_service import ImportService
+    # 读前/读后双重限流：任意登录用户可 POST 超大文件触发整读进内存（内存 DoS）
+    limit = settings.ATTACHMENT_MAX_MB * 1024 * 1024
+    if file.size and file.size > limit:
+        raise BizException(f"文件超过 {settings.ATTACHMENT_MAX_MB}MB")
     content = await file.read()
+    if len(content) > limit:
+        raise BizException(f"文件超过 {settings.ATTACHMENT_MAX_MB}MB")
     result = ImportService(db).preview(content)
     return ok(result)
 
@@ -473,9 +506,9 @@ def export_audit_logs(actor: str | None = None, action: str | None = None, targe
     rows = db.execute(q.order_by(AuditLog.id.desc()).limit(50000)).all()
 
     def _csv_safe(v):
-        """CSV 注入防护：以 = + - @ 开头的单元格加 ' 前缀，防 Excel 当公式执行。"""
+        """CSV 注入防护：以 = + - @ \\t \\r 开头的单元格加 ' 前缀（OWASP 要求），防 Excel 当公式执行。"""
         s = str(v) if v is not None else ""
-        return ("'" + s) if s and s[0] in "=+-@" else s
+        return ("'" + s) if s and s[0] in "=+-@\t\r" else s
 
     buf = io.StringIO()
     w = csv.writer(buf)

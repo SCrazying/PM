@@ -85,9 +85,10 @@ def cleanup_expired(db: Session, days: Optional[int] = None) -> int:
 # ---------- 项目操作流水线（V1.0.5，复用 audit_log，项目视角聚合） ----------
 
 # target_id 即 project_id 的操作类型（直系）
-_PROJECT_DIRECT_TYPES = ("project", "member", "project_risk", "weekly_goal", "weekly_goal_item")
-# 关联表解析归属的类型（target_id 是关联表主键，经子查询解析 project_id）
-_JOIN_TYPES = ("node", "task", "attachment", "progress")
+# 注意：weekly_goal 仅指 set_weekly_goal（target_id=project_id）；
+# 周目标条目类（增/改/完成/删）单独用 target_type="weekly_goal_item"，靠 detail.project_id 归属，
+# 避免 target_id=item_id 与项目 id 撞号导致跨项目误归属（见 query_project_activity）。
+_PROJECT_DIRECT_TYPES = ("project", "member", "project_risk", "weekly_goal")
 
 ACTION_LABELS = {
     "create": "新增", "update": "修改", "delete": "删除", "review": "评审",
@@ -148,22 +149,21 @@ def query_project_activity(db: Session, project_id: int, page: int = 1, size: in
     """项目操作流水线：聚合该项目相关的审计记录（项目直系 + 节点/任务/附件/进展/周目标条目归属）。
 
     权限由路由层校验（成员/负责人/admin）。"""
-    from app.models.misc import Attachment, Progress, WeeklyGoalItem
+    from app.models.misc import Attachment, Progress
     pid = str(project_id)
     node_ids = select(cast(ProjectNode.id, String)).where(ProjectNode.project_id == project_id)
     task_ids = select(cast(Task.id, String)).where(Task.project_id == project_id)
     att_ids = select(cast(Attachment.id, String)).where(Attachment.project_id == project_id)
     prog_ids = select(cast(Progress.id, String)).where(Progress.project_id == project_id)
-    # weekly_goal 的 target_id 有两义：整体周目标=project_id（直系），周目标条目=item_id（join）
-    wgi_ids = select(cast(WeeklyGoalItem.id, String)).where(WeeklyGoalItem.project_id == project_id)
 
     cond = or_(
         and_(AuditLog.target_type.in_(_PROJECT_DIRECT_TYPES), AuditLog.target_id == pid),
+        # 周目标条目 target_id=item_id（可能与其他项目 id 撞号），改用 detail.project_id JSONB 归属
+        and_(AuditLog.target_type == "weekly_goal_item", AuditLog.detail["project_id"].as_string() == pid),
         and_(AuditLog.target_type == "node", AuditLog.target_id.in_(node_ids)),
         and_(AuditLog.target_type == "task", AuditLog.target_id.in_(task_ids)),
         and_(AuditLog.target_type == "attachment", AuditLog.target_id.in_(att_ids)),
         and_(AuditLog.target_type == "progress", AuditLog.target_id.in_(prog_ids)),
-        and_(AuditLog.target_type == "weekly_goal", AuditLog.target_id.in_(wgi_ids)),
     )
     q = select(AuditLog, User.display_name).join(User, User.id == AuditLog.actor_id, isouter=True).where(cond)
     if action:

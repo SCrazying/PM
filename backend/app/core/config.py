@@ -53,7 +53,11 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    s = Settings()
+    # 生产红线：JWT_SECRET 必须显式配置，禁止回落到公共默认值（否则任意拿包者可伪造 admin token）
+    if s.APP_ENV == "prod" and (not s.JWT_SECRET or s.JWT_SECRET == "change-me-in-prod"):
+        raise RuntimeError("生产环境禁止使用默认 JWT_SECRET，请在 .env 配置随机密钥后重启")
+    return s
 
 
 settings = get_settings()
